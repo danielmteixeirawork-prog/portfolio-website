@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>O Teu Nome — Portefólio</title>
-<meta name="description" content="Portefólio de projetos de programação de O Teu Nome.">
+<title>Daniel Teixeira — Portfolio</title>
+<meta name="description" content="Portfolio of Daniel Teixeira, Systems Engineer & Product Manager building full-stack industrial monitoring platforms.">
 <link rel="stylesheet" href="css/style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,11 +17,11 @@
     <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
     <nav class="tabs">
       <a href="#top" class="tab">about.md</a>
-      <a href="#projetos" class="tab">projects.tsx</a>
+      <a href="#projects" class="tab">projects.tsx</a>
       <a href="#skills" class="tab">skills.json</a>
-      <a href="#contacto" class="tab">contact.sh</a>
+      <a href="#contact" class="tab">contact.sh</a>
     </nav>
-    <button class="theme-toggle" id="themeToggle" aria-label="Alternar tema" aria-pressed="false">
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
       <span class="theme-icon" aria-hidden="true">◐</span>
     </button>
   </div>
@@ -35,34 +35,42 @@
         <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span>
       </div>
       <div class="hero-code">
-        <p class="hero-comment">// portefólio — sessão iniciada</p>
-        <h1 class="hero-name"><span class="dim">const dev = "</span>O Teu Nome<span class="dim">"</span></h1>
-        <p class="hero-role"><span class="dim">função:</span> <span class="accent">Desenvolvedor de Software</span><span class="cursor" aria-hidden="true"></span></p>
+        <p class="hero-comment">// portfolio — session started</p>
+        <h1 class="hero-name"><span class="dim">const dev = "</span>Daniel Teixeira<span class="dim">"</span></h1>
+        <p class="hero-role"><span class="dim">role:</span> <span class="accent">Systems Engineer &amp; Product Manager</span><span class="cursor" aria-hidden="true"></span></p>
         <p class="hero-text">
-          Escrevo código para resolver problemas reais, do protótipo ao deploy.
-          Substitui este parágrafo por uma descrição breve sobre o teu percurso
-          e o tipo de coisas que gostas de construir.
+          I build full-stack industrial monitoring platforms at Maxiglobal —
+          connecting PLCs, sensors, and critical infrastructure to centralized
+          software over protocols like SNMP, Modbus, and BACnet, using
+          C#/.NET, React, and TypeScript.
         </p>
         <div class="hero-actions">
-          <a href="#projetos" class="btn btn-primary">./ver-projetos</a>
-          <a href="#contacto" class="btn btn-ghost">./contactar</a>
+          <a href="#projects" class="btn btn-primary">./view-projects</a>
+          <a href="#contact" class="btn btn-ghost">./contact</a>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="sobre" class="section">
-    <p class="section-tag">// sobre</p>
-    <h2 class="section-title">Sobre mim</h2>
+  <section id="about" class="section">
+    <p class="section-tag">// about</p>
+    <h2 class="section-title">About me</h2>
     <div class="about-grid">
       <div class="about-text">
         <p>
-          Escreve aqui um parágrafo sobre o teu percurso: onde estudaste,
-          que tecnologias usas no dia a dia, e o que te motiva em programação.
+          I studied Electrical and Computer Engineering at Instituto Superior
+          de Engenharia do Porto (ISEP), then started my career programming
+          PLCs and HMI/SCADA systems for wastewater treatment plants at
+          KLINGER Portugal. Since November 2024 I've been at Maxiglobal,
+          where I moved from Systems Engineer into a Product Manager role
+          while continuing to build software.
         </p>
         <p>
-          Podes falar de experiência profissional, projetos pessoais,
-          contribuições open-source, ou objetivos que tens para o futuro.
+          My work sits at the intersection of industrial automation, IT
+          infrastructure, and full-stack development — integrating equipment
+          like UPSs, generators, PLCs, and IP cameras into monitoring
+          platforms, and building the software (C#/.NET, React, TypeScript,
+          SQL) that makes that data reliably available.
         </p>
       </div>
       <aside class="about-card" aria-hidden="true">
@@ -71,25 +79,25 @@
           <span class="filename">whoami.out</span>
         </div>
         <pre class="about-card-body">$ whoami
-&gt; full-stack developer
-&gt; a construir coisas desde 20XX
-&gt; apaixonado por [a tua área]</pre>
+&gt; systems engineer &amp; product manager
+&gt; building industrial monitoring platforms since 2024
+&gt; based in Aveiro, Portugal</pre>
       </aside>
     </div>
   </section>
 
-  <section id="projetos" class="section">
-    <p class="section-tag">// projetos</p>
-    <h2 class="section-title">Projetos</h2>
+  <section id="projects" class="section">
+    <p class="section-tag">// projects</p>
+    <h2 class="section-title">Projects</h2>
     <div class="projects-grid">
 
       <article class="project-card">
         <div class="project-card-top">
           <span class="file-ext">.py</span>
-          <span class="project-private">repo privado</span>
+          <span class="project-private">private repo</span>
         </div>
         <h3>git-weekly-report</h3>
-        <p>CLI que varre um ou mais repositórios git e gera um relatório de commits por semana, agrupado por repositório e dia — responde a "o que fiz esta semana" sem abrir o GitHub.</p>
+        <p>CLI that scans one or more git repositories and generates a weekly commit report, grouped by repository and day — answers "what did I do this week" without opening GitHub.</p>
         <ul class="tags">
           <li>Python</li><li>CLI</li><li>Git</li>
         </ul>
@@ -98,22 +106,22 @@
       <article class="project-card">
         <div class="project-card-top">
           <span class="file-ext">.ps1</span>
-          <span class="project-private">repo privado</span>
+          <span class="project-private">private repo</span>
         </div>
         <h3>downloads-organizer</h3>
-        <p>Script PowerShell que organiza a pasta Downloads por tipo de ficheiro, com suporte nativo a <code>-WhatIf</code>/<code>-Confirm</code> e registo em CSV de cada movimento feito.</p>
+        <p>PowerShell script that organizes the Downloads folder by file type, with native <code>-WhatIf</code>/<code>-Confirm</code> support and a CSV log of every file moved.</p>
         <ul class="tags">
-          <li>PowerShell</li><li>Automação</li>
+          <li>PowerShell</li><li>Automation</li>
         </ul>
       </article>
 
       <article class="project-card">
         <div class="project-card-top">
           <span class="file-ext">.ps1</span>
-          <span class="project-private">repo privado</span>
+          <span class="project-private">private repo</span>
         </div>
         <h3>duplicate-file-finder</h3>
-        <p>Deteta ficheiros duplicados por conteúdo (hash), não por nome — agrupa primeiro por tamanho para evitar calcular hash de tudo, e remove duplicados em segurança com <code>-WhatIf</code>.</p>
+        <p>Finds duplicate files by content (hash), not by name — groups by size first to avoid hashing everything, and removes duplicates safely with <code>-WhatIf</code>.</p>
         <ul class="tags">
           <li>PowerShell</li><li>Performance</li>
         </ul>
@@ -122,12 +130,12 @@
       <article class="project-card">
         <div class="project-card-top">
           <span class="file-ext">.py</span>
-          <span class="project-private">repo privado</span>
+          <span class="project-private">private repo</span>
         </div>
         <h3>bank-statement-parser</h3>
-        <p>Lê um extrato bancário em CSV e categoriza automaticamente cada movimento por palavra-chave, mostrando um resumo de gastos por categoria e as maiores despesas.</p>
+        <p>Reads a bank statement CSV and automatically categorizes each transaction by keyword, showing a spending summary by category and the largest expenses.</p>
         <ul class="tags">
-          <li>Python</li><li>Dados</li>
+          <li>Python</li><li>Data</li>
         </ul>
       </article>
 
@@ -139,30 +147,30 @@
     <h2 class="section-title">Stack</h2>
     <div class="skills-grid">
       <div class="skills-group">
-        <h3>linguagens/</h3>
-        <ul><li><span class="prompt">&gt;</span> JavaScript / TypeScript</li><li><span class="prompt">&gt;</span> Python</li><li><span class="prompt">&gt;</span> C# / Java</li></ul>
+        <h3>languages/</h3>
+        <ul><li><span class="prompt">&gt;</span> C#</li><li><span class="prompt">&gt;</span> TypeScript / JavaScript</li><li><span class="prompt">&gt;</span> Ladder Logic / Structured Text</li></ul>
       </div>
       <div class="skills-group">
-        <h3>frontend/</h3>
-        <ul><li><span class="prompt">&gt;</span> React</li><li><span class="prompt">&gt;</span> HTML / CSS</li><li><span class="prompt">&gt;</span> Tailwind</li></ul>
+        <h3>web/</h3>
+        <ul><li><span class="prompt">&gt;</span> ASP.NET Core</li><li><span class="prompt">&gt;</span> React</li><li><span class="prompt">&gt;</span> Node.js / Express</li></ul>
       </div>
       <div class="skills-group">
-        <h3>backend/</h3>
-        <ul><li><span class="prompt">&gt;</span> Node.js</li><li><span class="prompt">&gt;</span> SQL / PostgreSQL</li><li><span class="prompt">&gt;</span> REST APIs</li></ul>
+        <h3>data/</h3>
+        <ul><li><span class="prompt">&gt;</span> Microsoft SQL Server</li><li><span class="prompt">&gt;</span> MariaDB</li></ul>
       </div>
       <div class="skills-group">
-        <h3>ferramentas/</h3>
-        <ul><li><span class="prompt">&gt;</span> Git / GitHub</li><li><span class="prompt">&gt;</span> Docker</li><li><span class="prompt">&gt;</span> Linux</li></ul>
+        <h3>industrial/</h3>
+        <ul><li><span class="prompt">&gt;</span> PLC / SCADA / HMI</li><li><span class="prompt">&gt;</span> SNMP, Modbus, BACnet</li><li><span class="prompt">&gt;</span> Siemens, Schneider Electric</li></ul>
       </div>
     </div>
   </section>
 
-  <section id="contacto" class="section section-contact">
-    <p class="section-tag">// contacto</p>
-    <h2 class="section-title">Vamos falar</h2>
+  <section id="contact" class="section section-contact">
+    <p class="section-tag">// contact</p>
+    <h2 class="section-title">Let's talk</h2>
     <p class="contact-text">
-      Tens um projeto em mente ou queres só trocar ideias? A minha caixa
-      de entrada está sempre aberta.
+      Have a project in mind, or just want to trade ideas? My inbox is
+      always open.
     </p>
     <div class="terminal-block">
       <div class="card-chrome">
@@ -172,7 +180,7 @@
       <div class="terminal-body">
         <p><span class="prompt">$</span> mail <a href="mailto:danielteixeira00@outlook.pt">danielteixeira00@outlook.pt</a></p>
         <p><span class="prompt">$</span> open <a href="https://github.com/danielmteixeirawork-prog" target="_blank" rel="noopener">github.com/danielmteixeirawork-prog</a></p>
-        <p><span class="prompt">$</span> open <a href="#" target="_blank" rel="noopener">linkedin.com/in/oteu-perfil</a></p>
+        <p><span class="prompt">$</span> open <a href="https://www.linkedin.com/in/danielteixeira-806b9b137" target="_blank" rel="noopener">linkedin.com/in/danielteixeira</a></p>
       </div>
     </div>
   </section>
