@@ -98,10 +98,22 @@
           <span class="file-ext">.cs</span>
           <span class="project-private">work project</span>
         </div>
-        <h3>EMS/MMS Monitoring Platform</h3>
-        <p>Full-stack industrial monitoring platform built from the ground up at Maxiglobal — backend in C#/.NET (ASP.NET Core), frontend in React/TypeScript, first prototyped in Node.js/Express before switching stacks pre-launch for performance and maintainability.</p>
+        <h3>EMS — Environmental Monitoring System</h3>
+        <p>Edge environmental monitoring system deployed on CM5-based hardware at each site — collects sensor data (temperature, humidity, HVAC, and more) and stores it locally in MariaDB. Built in C#/.NET (ASP.NET Core) and React/TypeScript.</p>
         <ul class="tags">
-          <li>C#</li><li>ASP.NET Core</li><li>React</li><li>TypeScript</li>
+          <li>C#</li><li>ASP.NET Core</li><li>React</li><li>MariaDB</li><li>Edge (CM5)</li>
+        </ul>
+      </article>
+
+      <article class="project-card">
+        <div class="project-card-top">
+          <span class="file-ext">.cs</span>
+          <span class="project-private">work project</span>
+        </div>
+        <h3>MMS — Monitoring Management System</h3>
+        <p>Central, server-deployed platform that aggregates monitoring data from EMS units across sites for management and alarming. Same C#/.NET and React/TypeScript stack as EMS, but backed by PostgreSQL + TimescaleDB for time-series data at scale.</p>
+        <ul class="tags">
+          <li>C#</li><li>ASP.NET Core</li><li>React</li><li>PostgreSQL</li><li>TimescaleDB</li>
         </ul>
       </article>
 
