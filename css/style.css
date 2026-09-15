@@ -282,6 +282,18 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 
 /* projects */
+.projects-subheading {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-2);
+  margin: 0 0 1em;
+}
+
+.projects-grid + .projects-subheading {
+  margin-top: 2.2em;
+}
+
 .projects-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
