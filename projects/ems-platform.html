@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMS Platform — Daniel Teixeira</title>
+<meta name="description" content="Case study: a solo-built, production full-stack platform for monitoring data-centre infrastructure — ASP.NET Core .NET 10 API, React 19 SPA, MySQL, and a fleet of 9–11 independent protocol workers (Modbus, SNMP, BACnet, Siemens S7, GPIO).">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <nav class="tabs">
+      <a href="../index.html#top" class="tab">about.md</a>
+      <a href="../index.html#projects" class="tab">projects.tsx</a>
+      <a href="ems-platform.html" class="tab" aria-current="page">ems-platform.md</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
+      <span class="theme-icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<main class="case">
+
+  <p class="breadcrumb">
+    <a href="../index.html">~</a><span class="sep">/</span><a href="../index.html#projects">projects</a><span class="sep">/</span>ems-platform
+  </p>
+
+  <header class="case-header">
+    <p class="case-kicker">// work project &middot; Maxiglobal</p>
+    <h1 class="case-title">EMS Platform</h1>
+    <p class="case-lede">
+      A full-stack platform for monitoring and controlling data-centre-style
+      infrastructure across multiple sites — built solo, running in production, and
+      operated by the person who wrote it.
+    </p>
+    <ul class="case-meta">
+      <li class="is-role">Sole developer &amp; operator</li>
+      <li>ASP.NET Core (.NET 10)</li>
+      <li>React 19</li>
+      <li>MySQL + Dapper</li>
+      <li>Worker Services</li>
+      <li>Modbus / SNMP / BACnet / S7</li>
+      <li>Linux · systemd · Nginx</li>
+    </ul>
+  </header>
+
+  <div class="tldr">
+    <p>
+      <strong>TL;DR —</strong> EMS monitors sensors, power and energy, HVAC, UPS, PDUs,
+      access control, digital I/O and alarms across multiple physical sites. It is a
+      from-scratch <strong>C#/.NET rewrite of an earlier Node.js/Express system</strong>,
+      migrated feature by feature against live traffic. Three cooperating pieces: an
+      <strong>ASP.NET Core API + React 19 SPA</strong>, a fleet of
+      <strong>9–11 independent protocol workers</strong>, and
+      <a href="kiosk-manager.html">KioskManager</a> for the on-site display boards.
+    </p>
+  </div>
+
+  <section class="case-section">
+    <h2>Overview</h2>
+    <p>
+      EMS (Energy/Environment Management System) is a solo-developed, production-deployed
+      system — I act as both developer and operator, running it directly against live
+      infrastructure. It is organised as three cooperating pieces:
+    </p>
+    <ul class="bullets">
+      <li>
+        <strong>EMS</strong> — the central web application (ASP.NET Core API + React SPA)
+        that users and admins interact with.
+      </li>
+      <li>
+        <strong>Services</strong> — 9–11 independent background workers that poll field
+        hardware (Modbus, SNMP, BACnet, Siemens S7, GPIO, ping, cameras) and feed the
+        shared database, plus notification and reporting workers.
+      </li>
+      <li>
+        <strong>KioskManager</strong> — a separate cross-platform desktop tool for
+        fleet-managing the physical kiosk display boards that show EMS dashboards on-site.
+        It has <a href="kiosk-manager.html">its own write-up</a>.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Architecture</h2>
+    <p>
+      A classic API + SPA split, deployed together behind Nginx on a single host, with
+      MySQL as the system of record:
+    </p>
+    <pre class="diagram">Browser (React SPA)
+      │  HTTPS
+      ▼
+   Nginx  ──────────────▶  ems-backend.service (ASP.NET Core, Kestrel)
+      │                          │
+      │                          ├─ Dapper (micro-ORM) ──▶ MySQL
+      │                          ├─ Server-Sent Events (live sensor/alarm push)
+      │                          └─ MySQL-backed auth ticket store (custom cookie auth)
+      ▼
+ static assets (built SPA, served from the API's "public" wwwroot)</pre>
+    <ul class="bullets">
+      <li>
+        <strong>Backend</strong>: ASP.NET Core on .NET 10, MVC-style Controllers →
+        Repositories. <strong>No EF Core</strong> — raw SQL via Dapper and MySqlConnector,
+        for full control over query shape and performance on a hand-tuned schema.
+      </li>
+      <li>
+        <strong>Frontend</strong>: React 19 + TypeScript built with Vite, served as static
+        files by the same backend process — one deployable unit, one systemd service, one
+        Nginx vhost.
+      </li>
+      <li>
+        <strong>Real-time updates</strong>: Server-Sent Events push live sensor readings
+        and alarm state to connected dashboards, with no polling.
+      </li>
+      <li>
+        <strong>Auth</strong>: cookie-based session auth with a custom
+        <strong>MySQL-backed ticket store</strong> (not the default in-memory / data
+        protection flow), CSRF middleware, and a permission-based authorization handler
+        gating admin actions by role and permission.
+      </li>
+      <li>
+        <strong>Security middleware</strong>: dedicated security-headers, CORS-policy,
+        CSRF, request-ID and audit-log middleware sit in the ASP.NET Core pipeline — every
+        admin mutation is written to an <code>audit_log</code> table.
+      </li>
+      <li>
+        <strong>Deployment</strong>: a self-contained <code>dotnet publish</code> build
+        installed in place as a systemd unit; Nginx terminates TLS and reverse-proxies to
+        Kestrel.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Backend structure</h2>
+    <pre class="diagram">backend/
+├── Controllers/    ~45 controllers — public site APIs (Sensors, Sites, Equipment,
+│                   Alarms, Energy, CCTV, Reports, Auth, SSE…) + Admin* controllers
+│                   (AdminUsers, AdminDatabase*, AdminServices, AdminBacnet,
+│                   AdminSnmpAgent, AdminDigitalIo, AdminSiteBackup, …)
+├── Repositories/   ~50 repositories, one per domain area — all SQL lives here (Dapper)
+├── Services/       cross-cutting logic: Hikvision door control, RTSP URL building,
+│                   Excel export (ClosedXML), credential encryption, BACnet discovery,
+│                   email/SMS settings, system helper bridge, SSE broadcast
+├── Auth/           CSRF service, MySQL ticket store, permission authorization handler
+├── Middleware/     audit log, CSRF, CORS, security headers, request ID
+├── Models/         DTOs grouped by domain (Admin, Alarms, Analytics, Auth, Cctv, …)
+└── Setup_DB/       SQL schema, timestamped migrations, seed data, shell scripts</pre>
+    <p>
+      Notable dependencies: BACnet (building-automation client), BCrypt.Net-Next (password
+      hashing), ClosedXML (Excel export), MailKit (SMTP), Serilog (structured file logging).
+    </p>
+
+    <h3>Two decisions worth calling out</h3>
+    <ul class="bullets">
+      <li>
+        The codebase <strong>pins a transitive <code>Microsoft.OpenApi</code> version</strong>
+        specifically to dodge a known CVE — a stack-overflow DoS in circular-reference
+        OpenAPI parsing — rather than waiting on upstream to bump it.
+      </li>
+      <li>
+        A <strong>privileged operations helper</strong> (<code>ems-system-helper</code>)
+        brokers root-level actions — service restarts, network configuration — from an
+        unprivileged web process via sudo, instead of running the whole API as root.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Frontend</h2>
+    <pre class="diagram">frontend/src/
+├── pages/        Admin, Alarms, Analytics, Cctv, Equipment, GridView, Login,
+│                 Reports, SiteView
+├── components/   Admin, Equipment, GridView, Layout, UI, icons — shared UI
+├── stores/       client-side state
+├── contexts/     React context providers (auth, theme, …)
+├── hooks/        custom hooks
+├── services/     API client layer (axios)
+└── utils/, types/, constants/, data/</pre>
+    <ul class="bullets">
+      <li>
+        <strong>Chart.js</strong> (with zoom and date-fns adapters) for time-series graphs,
+        and <strong>@tanstack/react-virtual</strong> to virtualise large lists and grids.
+      </li>
+      <li>
+        <strong>ExcelJS / JSZip</strong> for client-side export, <strong>SortableJS</strong>
+        for drag-and-drop dashboard layout editing, and <strong>DOMPurify</strong> for
+        XSS-safe HTML rendering.
+      </li>
+      <li>Multi-language UI, with flag-icons for locale selection.</li>
+      <li>
+        Vitest + Testing Library for tests; ESLint 9 (flat config) with typescript-eslint.
+        Production builds are minified by Vite and additionally run through
+        javascript-obfuscator.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Database</h2>
+    <p>
+      MySQL, schema-managed through versioned SQL migration files
+      (<code>Setup_DB/migrations/</code>) applied by a tracked shell script, with a separate
+      <code>seed/</code> directory for reference data (sensor-type icon catalogues, for
+      example) and a <code>utilities/</code> folder for one-off maintenance scripts.
+    </p>
+    <p>
+      The admin UI itself exposes database backup, performance tuning, partition management
+      and maintenance controllers — database operations are a first-class admin feature
+      here, not just an ops-side concern.
+    </p>
+  </section>
+
+  <section class="case-section">
+    <h2>Services — the peripheral worker fleet</h2>
+    <div class="metrics">
+      <div class="metric"><span class="metric-value">9–11</span><span class="metric-label">independent worker processes</span></div>
+      <div class="metric"><span class="metric-value">6+</span><span class="metric-label">field protocols spoken</span></div>
+      <div class="metric"><span class="metric-value">2</span><span class="metric-label">CPU targets (x64 + ARM64)</span></div>
+    </div>
+    <p>
+      Nine to eleven independent .NET Worker Service processes
+      (<code>Microsoft.Extensions.Hosting</code>), each a long-running daemon polling one
+      class of field hardware and writing readings into the shared MySQL database the API
+      reads from. Each is its own systemd unit, independently deployable and restartable —
+      a genuine microservice decomposition rather than a monolith, chosen so that a crash
+      or hang in one protocol driver (a flaky Modbus RTU serial line, say) can't take down
+      sensor polling for everything else.
+    </p>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th scope="col">Service</th><th scope="col">Protocol / purpose</th><th scope="col">Key library</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>modbusIP</td><td>Modbus TCP polling</td><td>FluentModbus</td></tr>
+          <tr><td>modbusRTU</td><td>Modbus over serial</td><td>FluentModbus</td></tr>
+          <tr><td>snmp</td><td>SNMP polling (UPS, PDUs, network gear)</td><td>Lextm.SharpSnmpLib</td></tr>
+          <tr><td>snmpAgent</td><td>Exposes EMS data as an SNMP agent (traps out)</td><td>Lextm.SharpSnmpLib</td></tr>
+          <tr><td>notification</td><td>Email / SMS / SNMP-trap alerting on alarm conditions</td><td>MailKit, SharpSnmpLib, System.Device.Gpio</td></tr>
+          <tr><td>report</td><td>Scheduled PDF and chart report generation</td><td>QuestPDF, ScottPlot, MailKit</td></tr>
+          <tr><td>hikvision</td><td>Camera and door-controller integration</td><td>—</td></tr>
+          <tr><td>ping</td><td>Network reachability and latency polling</td><td>—</td></tr>
+          <tr><td>gpio</td><td>Onboard GPIO for the CM5 hardware target</td><td>System.Device.Gpio</td></tr>
+          <tr><td>bacnet</td><td>BACnet/IP building-automation polling <span class="dim">(newer)</span></td><td>BACnet</td></tr>
+          <tr><td>siemens</td><td>Siemens S7 PLC polling, batched multi-point reads <span class="dim">(newer)</span></td><td>S7netplus</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="bullets">
+      <li>
+        Shared conventions across all of them: Serilog file + console logging,
+        MySqlConnector for direct database access, DotNetEnv for <code>.env</code>-based
+        configuration (credentials, poll intervals, device lists), a common
+        <code>Shared/</code> project, and a <code>Directory.Build.props</code> for
+        consistent build settings.
+      </li>
+      <li>
+        Most target .NET 8, with the newer additions on .NET 10 — reflecting an incremental
+        migration as the runtime matured.
+      </li>
+      <li>
+        Production binaries are published <strong>self-contained and single-file for
+        linux-x64</strong>, with a parallel <strong>linux-arm64</strong> publish path: the
+        same services run on a standard x64 host and on embedded ARM hardware
+        (Raspberry Pi CM5).
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>What this project demonstrates</h2>
+    <ul class="bullets">
+      <li>
+        <strong>End-to-end full-stack ownership</strong>: relational schema design and
+        migrations, a typed API layer, a modern React SPA, and a native cross-platform
+        desktop client — all built and operated solo.
+      </li>
+      <li>
+        <strong>Protocol-level industrial integration</strong>: Modbus (TCP and RTU), SNMP
+        (client and agent), BACnet/IP, Siemens S7, GPIO, and RTSP/ONVIF-style camera
+        control — real fieldbus and OT protocols, not REST-to-REST plumbing.
+      </li>
+      <li>
+        <strong>Production operations discipline</strong>: audit logging, CSRF and security
+        headers, encrypted credential storage, a privileged-helper pattern instead of
+        running as root, scoped per-service redeploys, and a deploy runbook driven by real
+        incidents — including an <code>rm -rf</code> bug in the publish script that
+        silently wiped production logs, found and fixed from first principles.
+      </li>
+      <li>
+        <strong>Deliberate microservice boundaries</strong>: each hardware protocol is an
+        isolated, independently restartable systemd service rather than threads inside a
+        monolith — a fault-isolation decision, not a tutorial pattern.
+      </li>
+      <li>
+        <strong>Migration discipline</strong>: an active, feature-by-feature rewrite of a
+        legacy Node.js system into typed C#, run in parallel with a live production system.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>My role</h2>
+    <p>
+      Sole developer and operator: schema and migrations, API, authentication and security
+      middleware, the worker fleet and its protocol drivers, the React frontend, the
+      publish and deployment scripting, and day-to-day operation against live
+      infrastructure.
+    </p>
+  </section>
+
+  <nav class="case-nav">
+    <a href="../index.html#projects" class="btn btn-ghost">&larr; ./all-projects</a>
+    <span class="case-nav-links">
+      <a href="gt-gest.html" class="btn btn-ghost">Gt Gest &rarr;</a>
+      <a href="kiosk-manager.html" class="btn btn-ghost">Kiosk Manager &rarr;</a>
+    </span>
+  </nav>
+
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="branch"><span class="branch-dot" aria-hidden="true"></span>main</span>
+    <span class="statusbar-spacer"></span>
+    <span>UTF-8</span>
+    <span id="year"></span>
+  </div>
+</footer>
+
+<script src="../js/script.js"></script>
+</body>
+</html>

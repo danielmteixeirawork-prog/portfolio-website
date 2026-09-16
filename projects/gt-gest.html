@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gt Gest — Daniel Teixeira</title>
+<meta name="description" content="Case study: internal full-stack management platform in React 19 and ASP.NET Core .NET 10 with Dapper over MariaDB — append-only stock ledger, concurrency-safe reservations, Kanban task board and encrypted customer credentials.">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <nav class="tabs">
+      <a href="../index.html#top" class="tab">about.md</a>
+      <a href="../index.html#projects" class="tab">projects.tsx</a>
+      <a href="gt-gest.html" class="tab" aria-current="page">gt-gest.md</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
+      <span class="theme-icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<main class="case">
+
+  <p class="breadcrumb">
+    <a href="../index.html">~</a><span class="sep">/</span><a href="../index.html#projects">projects</a><span class="sep">/</span>gt-gest
+  </p>
+
+  <header class="case-header">
+    <p class="case-kicker">// work project &middot; Maxiglobal</p>
+    <h1 class="case-title">Gt Gest</h1>
+    <p class="case-lede">
+      An internal management platform: the web application the team uses to run
+      warehouse stock, day-to-day tasks, and the technical record of every customer.
+    </p>
+    <ul class="case-meta">
+      <li class="is-role">Design &amp; full-stack development</li>
+      <li>React 19</li>
+      <li>TypeScript</li>
+      <li>ASP.NET Core (.NET 10)</li>
+      <li>Dapper</li>
+      <li>MariaDB</li>
+      <li>IIS</li>
+    </ul>
+  </header>
+
+  <div class="tldr">
+    <p>
+      <strong>TL;DR —</strong> Internal full-stack platform in
+      <strong>React 19 + TypeScript</strong> and <strong>ASP.NET Core .NET 10</strong>,
+      with <strong>Dapper</strong> over <strong>MariaDB</strong>. It combines stock
+      management built on an immutable movement ledger with concurrency-safe
+      reservations, a drag-and-drop Kanban board with calendar and Excel export, and a
+      customer record with encrypted, audited credentials. A single process serves both
+      the API and the SPA on IIS.
+    </p>
+  </div>
+
+  <section class="case-section">
+    <h2>Overview</h2>
+    <p>
+      Gt Gest replaces spreadsheets with one internal application. It has three modules:
+    </p>
+    <ul class="bullets">
+      <li>
+        <strong>Stock</strong> — items, categories, receipts, issues and adjustments,
+        per-project reservations, and a warehouse dashboard.
+      </li>
+      <li>
+        <strong>Work (tasks)</strong> — a drag-and-drop Kanban board plus table and
+        calendar views, subtasks, comments, labels, task links, followers, change
+        history, saved views, a personal "My work" page, a team dashboard, and Excel
+        export.
+      </li>
+      <li>
+        <strong>Customers</strong> — contacts, platforms, interventions, equipment,
+        documents, backups and remote access, with a per-customer event log.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Stack</h2>
+    <table class="stack-table">
+      <tbody>
+        <tr>
+          <th scope="row">Frontend</th>
+          <td>React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, React Router 7, dnd-kit (drag &amp; drop), Axios, Vitest, Testing Library, ESLint</td>
+        </tr>
+        <tr>
+          <th scope="row">Backend</th>
+          <td>C# / ASP.NET Core (.NET 10) with Controllers and <strong>Dapper</strong> (hand-written SQL), Serilog, ClosedXML for Excel</td>
+        </tr>
+        <tr>
+          <th scope="row">Database</th>
+          <td>MariaDB 10.6+ (InnoDB, utf8mb4), numbered SQL migrations, PowerShell setup and seed scripts</td>
+        </tr>
+        <tr>
+          <th scope="row">Tests</th>
+          <td>xUnit v3 against a real MariaDB schema</td>
+        </tr>
+        <tr>
+          <th scope="row">Deployment</th>
+          <td>IIS on Windows Server — one site serves both API and SPA, with publish and site-creation scripts</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="case-section">
+    <h2>Architecture</h2>
+    <pre class="diagram">Browser ──HTTPS──▶ IIS ─ one ASP.NET Core process
+                          │
+                          ├─ /api/*  ─▶ Controllers  (validate · delegate · ApiResponse envelope)
+                          │                 ├─▶ Services      (writes + business rules)
+                          │                 └─▶ Repositories  (reads only)
+                          │                            │ Dapper / hand-written SQL
+                          │                            ▼
+                          │                       MariaDB 10.6 (InnoDB)
+                          │
+                          └─ /*      ─▶ wwwroot (built React SPA) ─▶ index.html</pre>
+    <ul class="bullets">
+      <li>
+        <strong>One process, one origin</strong>: ASP.NET Core serves the API under
+        <code>/api</code> and the compiled SPA from <code>wwwroot</code>. No CORS, no
+        second web server. Unknown <code>/api</code> routes return JSON 404s; everything
+        else falls through to <code>index.html</code> for React Router.
+      </li>
+      <li>
+        <strong>Strict separation of responsibilities</strong>: repositories only read,
+        services only write (and own the business rules), controllers only validate,
+        delegate, and wrap the result in a common <code>ApiResponse</code> envelope. When
+        a number looks wrong, there is exactly one place to look.
+      </li>
+      <li>
+        Exception middleware that translates domain errors into HTTP status codes with
+        Portuguese messages.
+      </li>
+      <li>
+        Tuned HTTP caching: hashed assets are served <code>immutable</code> while
+        <code>index.html</code> goes out <code>no-cache</code>, so deployments reach
+        browsers immediately.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Authentication &amp; security</h2>
+    <ul class="bullets">
+      <li>Passwords hashed with <strong>BCrypt</strong> (work factor 12).</li>
+      <li>
+        <strong>Cookie auth with server-side sessions</strong> via a custom
+        <code>ITicketStore</code>: the cookie carries only the session id, the ticket
+        lives in a database table, and an administrator can revoke a session instantly.
+        <code>HttpOnly</code>, <code>SameSite=Strict</code>, sliding expiration.
+      </li>
+      <li>
+        <strong>Two layers of CSRF defence</strong>: on top of SameSite, a double-submit
+        token <strong>signed with HMAC-SHA256</strong> and compared in constant time — so
+        nobody can plant a valid cookie/header pair.
+      </li>
+      <li>
+        <strong>Login rate limiting per IP</strong> rather than per user, to stop password
+        spraying, with <code>ForwardedHeaders</code> restricted to loopback so the client
+        IP cannot be spoofed.
+      </li>
+      <li><code>admin</code>/<code>user</code> roles enforced with <code>[Authorize(Roles)]</code>.</li>
+      <li>
+        <strong>Customer credentials encrypted</strong> with ASP.NET Data Protection under
+        a dedicated purpose: they never appear in list responses, and every read is logged
+        with the name of whoever requested it.
+      </li>
+      <li>
+        <strong>Customer files stored outside <code>wwwroot</code></strong>: streamed to
+        disk while the SHA-256 hash is computed, then stored under that hash as the
+        filename — the browser-supplied name never touches the file system — with a size
+        limit and access only through authenticated endpoints.
+      </li>
+      <li>
+        HSTS, a persisted key ring (sessions survive IIS recycles), and a one-time initial
+        administrator bootstrap.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Technical highlights</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Stock as an accounting ledger</strong>: the on-hand quantity is only a
+        cache of the sum of movements. Every change writes its movement in the same
+        transaction, movements are append-only (corrections are adjustments), and a
+        <em>reconcile</em> endpoint recomputes quantities and reports drift.
+      </li>
+      <li>
+        <strong>Reservations vs. stock</strong>: <code>available = on hand − active
+        reservations</code>. A reservation moves no stock; only fulfilling it generates
+        the associated issue. Admin-forced over-commitment shows up as negative
+        availability instead of being hidden.
+      </li>
+      <li>
+        <strong>Concurrency</strong>: every operation on an item starts by locking the row
+        (<code>SELECT … FOR UPDATE</code>), so two people reserving the last unit queue up
+        instead of both succeeding. There are dedicated tests for this.
+      </li>
+      <li>
+        <strong>Integrity enforced in the database</strong>: <code>CHECK</code> constraints
+        that forbid negative balances, <code>DECIMAL(14,3)</code> quantities, and timestamps
+        always in UTC.
+      </li>
+      <li>
+        <strong>Kanban ordering by fractional index</strong>, so cards move without
+        renumbering the whole column.
+      </li>
+      <li>
+        <strong>Saved views and URL-encoded state</strong>: filters live in the URL, so they
+        can be shared or saved.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Quality</h2>
+    <div class="metrics">
+      <div class="metric"><span class="metric-value">~110</span><span class="metric-label">automated tests</span></div>
+      <div class="metric"><span class="metric-value">82</span><span class="metric-label">backend, incl. concurrency</span></div>
+      <div class="metric"><span class="metric-value">29</span><span class="metric-label">frontend</span></div>
+      <div class="metric"><span class="metric-value">3</span><span class="metric-label">modules in one app</span></div>
+    </div>
+    <ul class="bullets">
+      <li>
+        Backend tests run against a real MariaDB and report as <em>skipped</em> when no
+        database is available. Each test leaves the database as it found it and asserts on
+        <strong>deltas</strong> rather than absolute values, which keeps them repeatable.
+      </li>
+      <li>
+        Strict TypeScript, ESLint, and deployment documentation covering the usual IIS
+        pitfalls (Hosting Bundle, permissions on <code>logs\</code> and <code>keys\</code>).
+      </li>
+      <li>Interface in European Portuguese.</li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>My role</h2>
+    <p>
+      Full design and development: database modelling, stock rules, API, authentication,
+      frontend, and IIS deployment.
+    </p>
+  </section>
+
+  <nav class="case-nav">
+    <a href="../index.html#projects" class="btn btn-ghost">&larr; ./all-projects</a>
+    <span class="case-nav-links">
+      <a href="kiosk-manager.html" class="btn btn-ghost">Kiosk Manager &rarr;</a>
+      <a href="ems-discovery.html" class="btn btn-ghost">EMS Discovery &rarr;</a>
+    </span>
+  </nav>
+
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="branch"><span class="branch-dot" aria-hidden="true"></span>main</span>
+    <span class="statusbar-spacer"></span>
+    <span>UTF-8</span>
+    <span id="year"></span>
+  </div>
+</footer>
+
+<script src="../js/script.js"></script>
+</body>
+</html>

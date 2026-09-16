@@ -42,7 +42,8 @@
           I build full-stack industrial monitoring platforms at Maxiglobal —
           connecting PLCs, sensors, and critical infrastructure to centralized
           software over protocols like SNMP, Modbus, and BACnet, using
-          C#/.NET, React, and TypeScript.
+          C#/.NET, React, and TypeScript. I design them end to end: database
+          schema, API, authentication, background services, and the UI.
         </p>
         <div class="hero-actions">
           <a href="#projects" class="btn btn-primary">./view-projects</a>
@@ -89,32 +90,77 @@
   <section id="projects" class="section">
     <p class="section-tag">// projects</p>
     <h2 class="section-title">Projects</h2>
+    <p class="section-intro">
+      The work projects have full write-ups — stack, architecture, security model and
+      the engineering decisions behind them. The code itself is proprietary.
+    </p>
 
     <h3 class="projects-subheading">work/</h3>
     <div class="projects-grid">
 
-      <article class="project-card">
+      <article class="project-card project-card--linked">
         <div class="project-card-top">
           <span class="file-ext">.cs</span>
           <span class="project-private">work project</span>
         </div>
-        <h3>EMS — Environmental Monitoring System</h3>
-        <p>Edge environmental monitoring system deployed on CM5-based hardware at each site — collects sensor data (temperature, humidity, HVAC, and more) and stores it locally in MariaDB. Built in C#/.NET (ASP.NET Core) and React/TypeScript.</p>
+        <h3>ModSecure MMS — DCIM &amp; physical security</h3>
+        <p>Full rewrite of an enterprise DCIM platform: data-centre monitoring, access control and CCTV. React 19 SPA, .NET 10 minimal APIs, PostgreSQL + TimescaleDB, SNMP/Modbus collectors, WebRTC video, and a 17.4M-row legacy migration that validated with zero diffs.</p>
         <ul class="tags">
-          <li>C#</li><li>ASP.NET Core</li><li>React</li><li>MariaDB</li><li>Edge (CM5)</li>
+          <li>React 19</li><li>ASP.NET Core 10</li><li>TimescaleDB</li><li>SignalR</li><li>SNMP / Modbus</li>
         </ul>
+        <a class="project-more" href="projects/modsecure-mms.html">read the case study →</a>
       </article>
 
-      <article class="project-card">
+      <article class="project-card project-card--linked">
         <div class="project-card-top">
           <span class="file-ext">.cs</span>
           <span class="project-private">work project</span>
         </div>
-        <h3>MMS — Monitoring Management System</h3>
-        <p>Central, server-deployed platform that aggregates monitoring data from EMS units across sites for management and alarming. Same C#/.NET and React/TypeScript stack as EMS, but backed by PostgreSQL + TimescaleDB for time-series data at scale.</p>
+        <h3>EMS Platform — multi-site infrastructure monitoring</h3>
+        <p>Solo-built, production platform monitoring sensors, energy, HVAC, UPS, PDUs, access control and alarms across multiple sites. ASP.NET Core API plus React SPA behind Nginx, MySQL through Dapper, live push over Server-Sent Events — fed by a fleet of 9–11 independent protocol workers. A feature-by-feature rewrite of a legacy Node.js system.</p>
         <ul class="tags">
-          <li>C#</li><li>ASP.NET Core</li><li>React</li><li>PostgreSQL</li><li>TimescaleDB</li>
+          <li>ASP.NET Core 10</li><li>React 19</li><li>MySQL / Dapper</li><li>Worker Services</li><li>Modbus / SNMP / BACnet</li><li>Linux</li>
         </ul>
+        <a class="project-more" href="projects/ems-platform.html">read the case study →</a>
+      </article>
+
+      <article class="project-card project-card--linked">
+        <div class="project-card-top">
+          <span class="file-ext">.cs</span>
+          <span class="project-private">work project</span>
+        </div>
+        <h3>Gt Gest — internal management platform</h3>
+        <p>Warehouse stock, day-to-day tasks and customer records in one internal app. Stock is an append-only ledger with row-locked, concurrency-safe reservations, and a single ASP.NET Core process serves both the API and the React SPA on IIS.</p>
+        <ul class="tags">
+          <li>React 19</li><li>ASP.NET Core 10</li><li>Dapper</li><li>MariaDB</li><li>IIS</li>
+        </ul>
+        <a class="project-more" href="projects/gt-gest.html">read the case study →</a>
+      </article>
+
+      <article class="project-card project-card--linked">
+        <div class="project-card-top">
+          <span class="file-ext">.cs</span>
+          <span class="project-private">work project</span>
+        </div>
+        <h3>Kiosk Manager — fleet device management</h3>
+        <p>Cross-platform Avalonia desktop app for managing the on-site kiosk boards that display EMS dashboards. Administration runs over a bearer-token REST API served by a root Python agent on each board — deliberately not SSH — with UDP-broadcast and CIDR-scan discovery and embedded provisioning scripts.</p>
+        <ul class="tags">
+          <li>.NET 10</li><li>Avalonia</li><li>MVVM</li><li>Python agent</li><li>SSH.NET</li>
+        </ul>
+        <a class="project-more" href="projects/kiosk-manager.html">read the case study →</a>
+      </article>
+
+      <article class="project-card project-card--linked">
+        <div class="project-card-top">
+          <span class="file-ext">.cs</span>
+          <span class="project-private">work project</span>
+        </div>
+        <h3>EMS Discovery — field tool</h3>
+        <p>WPF desktop tool for field technicians: finds Raspberry Pi EMS controllers on the customer's LAN (ARP table, parallel ping sweep, vendor MAC matching) and exports their MariaDB databases to <code>.sql</code>. Ships as a single self-contained executable.</p>
+        <ul class="tags">
+          <li>C# / .NET 10</li><li>WPF</li><li>Networking</li><li>MySqlConnector</li>
+        </ul>
+        <a class="project-more" href="projects/ems-discovery.html">read the case study →</a>
       </article>
 
     </div>
@@ -179,19 +225,31 @@
     <div class="skills-grid">
       <div class="skills-group">
         <h3>languages/</h3>
-        <ul><li><span class="prompt">&gt;</span> C#</li><li><span class="prompt">&gt;</span> TypeScript / JavaScript</li><li><span class="prompt">&gt;</span> Ladder Logic / Structured Text</li></ul>
+        <ul><li><span class="prompt">&gt;</span> C#</li><li><span class="prompt">&gt;</span> TypeScript / JavaScript</li><li><span class="prompt">&gt;</span> SQL</li><li><span class="prompt">&gt;</span> Python</li><li><span class="prompt">&gt;</span> Ladder Logic / Structured Text</li></ul>
       </div>
       <div class="skills-group">
-        <h3>web/</h3>
-        <ul><li><span class="prompt">&gt;</span> ASP.NET Core</li><li><span class="prompt">&gt;</span> React</li><li><span class="prompt">&gt;</span> Node.js / Express</li></ul>
+        <h3>backend/</h3>
+        <ul><li><span class="prompt">&gt;</span> ASP.NET Core (.NET 10)</li><li><span class="prompt">&gt;</span> Minimal APIs &amp; Controllers</li><li><span class="prompt">&gt;</span> Dapper / EF Core</li><li><span class="prompt">&gt;</span> SignalR / Server-Sent Events</li><li><span class="prompt">&gt;</span> Worker Services</li><li><span class="prompt">&gt;</span> Node.js / Express</li></ul>
+      </div>
+      <div class="skills-group">
+        <h3>frontend/</h3>
+        <ul><li><span class="prompt">&gt;</span> React 19</li><li><span class="prompt">&gt;</span> Vite</li><li><span class="prompt">&gt;</span> Tailwind CSS</li><li><span class="prompt">&gt;</span> TanStack Query</li><li><span class="prompt">&gt;</span> Chart.js</li><li><span class="prompt">&gt;</span> WPF / Avalonia (desktop)</li></ul>
       </div>
       <div class="skills-group">
         <h3>data/</h3>
-        <ul><li><span class="prompt">&gt;</span> Microsoft SQL Server</li><li><span class="prompt">&gt;</span> MariaDB</li></ul>
+        <ul><li><span class="prompt">&gt;</span> PostgreSQL + TimescaleDB</li><li><span class="prompt">&gt;</span> MariaDB / MySQL</li><li><span class="prompt">&gt;</span> Microsoft SQL Server</li><li><span class="prompt">&gt;</span> Versioned SQL migrations</li></ul>
+      </div>
+      <div class="skills-group">
+        <h3>security/</h3>
+        <ul><li><span class="prompt">&gt;</span> Argon2id / BCrypt</li><li><span class="prompt">&gt;</span> Server-side sessions</li><li><span class="prompt">&gt;</span> TOTP / SMS / email 2FA</li><li><span class="prompt">&gt;</span> CSRF &amp; rate limiting</li><li><span class="prompt">&gt;</span> Encryption at rest</li></ul>
+      </div>
+      <div class="skills-group">
+        <h3>testing-and-ops/</h3>
+        <ul><li><span class="prompt">&gt;</span> xUnit (unit + integration)</li><li><span class="prompt">&gt;</span> Vitest / Testing Library</li><li><span class="prompt">&gt;</span> GitHub Actions CI</li><li><span class="prompt">&gt;</span> IIS / Windows Server</li><li><span class="prompt">&gt;</span> Linux, systemd, Nginx</li><li><span class="prompt">&gt;</span> PowerShell automation</li></ul>
       </div>
       <div class="skills-group">
         <h3>industrial/</h3>
-        <ul><li><span class="prompt">&gt;</span> PLC data integration</li><li><span class="prompt">&gt;</span> SNMP, Modbus, BACnet</li></ul>
+        <ul><li><span class="prompt">&gt;</span> PLC data integration</li><li><span class="prompt">&gt;</span> SNMP (client + agent)</li><li><span class="prompt">&gt;</span> Modbus TCP / RTU</li><li><span class="prompt">&gt;</span> BACnet/IP, Siemens S7</li><li><span class="prompt">&gt;</span> GPIO, RTSP / ONVIF</li></ul>
       </div>
     </div>
   </section>

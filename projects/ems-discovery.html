@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMS Discovery — Daniel Teixeira</title>
+<meta name="description" content="Case study: a WPF .NET 10 desktop tool for field technicians that discovers Raspberry Pi EMS controllers on a LAN and exports their MariaDB databases to .sql, shipped as a single self-contained executable.">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <nav class="tabs">
+      <a href="../index.html#top" class="tab">about.md</a>
+      <a href="../index.html#projects" class="tab">projects.tsx</a>
+      <a href="ems-discovery.html" class="tab" aria-current="page">ems-discovery.md</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
+      <span class="theme-icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<main class="case">
+
+  <p class="breadcrumb">
+    <a href="../index.html">~</a><span class="sep">/</span><a href="../index.html#projects">projects</a><span class="sep">/</span>ems-discovery
+  </p>
+
+  <header class="case-header">
+    <p class="case-kicker">// work project &middot; Maxiglobal</p>
+    <h1 class="case-title">EMS Discovery</h1>
+    <p class="case-lede">
+      A Windows desktop tool that finds EMS controllers (Raspberry Pi) on a local
+      network and backs up their MariaDB/MySQL databases.
+    </p>
+    <ul class="case-meta">
+      <li class="is-role">Sole developer</li>
+      <li>C# / .NET 10</li>
+      <li>WPF (XAML)</li>
+      <li>async/await</li>
+      <li>MySqlConnector</li>
+      <li>Single-file self-contained</li>
+    </ul>
+  </header>
+
+  <div class="tldr">
+    <p>
+      <strong>TL;DR —</strong> A <strong>WPF desktop app on .NET 10</strong> for field
+      technicians. It automatically detects Raspberry Pi devices on the local network
+      (ARP table, parallel ping sweep, and vendor MAC filtering) and exports those
+      devices' MariaDB databases to <code>.sql</code>, with live progress and
+      cancellation. Shipped as a single executable with no dependencies to install.
+    </p>
+  </div>
+
+  <section class="case-section">
+    <h2>Overview</h2>
+    <p>
+      A support tool for on-site installation and maintenance. The technician joins the
+      customer's network, hits "Start Scan", and sees the controllers that were found.
+      From there they can open the device's web interface or connect to its database and
+      pull a backup — without installing anything else.
+    </p>
+  </section>
+
+  <section class="case-section">
+    <h2>Stack</h2>
+    <table class="stack-table">
+      <tbody>
+        <tr>
+          <th scope="row">Language / UI</th>
+          <td>C# / .NET 10, <strong>WPF</strong> (XAML) with custom styles</td>
+        </tr>
+        <tr>
+          <th scope="row">Networking</th>
+          <td><code>System.Net.NetworkInformation</code> (ping, interfaces), reverse DNS, ARP table parsing</td>
+        </tr>
+        <tr>
+          <th scope="row">Database</th>
+          <td>MySqlConnector (MariaDB / MySQL)</td>
+        </tr>
+        <tr>
+          <th scope="row">Distribution</th>
+          <td><code>dotnet publish</code> self-contained, <strong>single-file</strong> for win-x64</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="case-section">
+    <h2>Architecture</h2>
+    <pre class="diagram">MainWindow (WPF / XAML)
+   │  async/await · CancellationToken · IProgress&lt;T&gt; · Dispatcher marshalling
+   │
+   ├─▶ NetworkDiscoveryService ──┬─▶ ArpService    read + parse the system ARP table
+   │                             ├─▶ PingService   sweep, ≤50 concurrent (SemaphoreSlim)
+   │                             └─▶ reverse DNS + Raspberry Pi OUI match
+   │
+   └─▶ DatabaseService ──▶ MySqlConnector ──▶ MariaDB on the device ──▶ .sql file</pre>
+    <p>
+      A deliberately small structure: the UI (<code>MainWindow</code>) holds no network or
+      database logic, and each service does one job — which is what makes the whole thing
+      cancellable and testable by hand in the field.
+    </p>
+  </section>
+
+  <section class="case-section">
+    <h2>Features</h2>
+
+    <h3>Scanner tab</h3>
+    <ul class="bullets">
+      <li>
+        <strong>Two-phase discovery:</strong> first an immediate read of the system ARP
+        table, so already-known devices appear at once; then a full sweep of every active
+        IPv4 subnet — detecting the interfaces, deriving the network and prefix from the
+        mask, and skipping networks larger than /16.
+      </li>
+      <li>
+        <strong>Parallel sweep</strong> with up to 50 concurrent pings
+        (<code>SemaphoreSlim</code>) and cancellation at any point.
+      </li>
+      <li>
+        <strong>Vendor identification</strong>: the MAC of every responding IP is matched
+        against Raspberry Pi OUI prefixes, and the hostname is resolved by reverse DNS.
+      </li>
+      <li>
+        A live, duplicate-free list (IP, MAC, hostname, state, last seen). Double-clicking
+        a row opens the device's web interface.
+      </li>
+    </ul>
+
+    <h3>Database tab</h3>
+    <ul class="bullets">
+      <li>Connects to MariaDB/MySQL with the host pre-filled from the discovered device.</li>
+      <li>Lists the databases, excluding system schemas.</li>
+      <li>
+        <strong>A <code>.sql</code> backup writer built from scratch</strong>:
+        <code>SHOW CREATE TABLE</code> plus per-table <code>INSERT</code>s, with correct
+        value escaping (binaries as hex, dates, numbers in invariant culture) and
+        <code>FOREIGN_KEY_CHECKS</code> disabled during restore.
+      </li>
+      <li>
+        Per-table progress bar, cancellation (the incomplete file is deleted), and a
+        timestamped log.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Technical highlights</h2>
+    <div class="metrics">
+      <div class="metric"><span class="metric-value">50</span><span class="metric-label">concurrent pings</span></div>
+      <div class="metric"><span class="metric-value">2</span><span class="metric-label">phase discovery</span></div>
+      <div class="metric"><span class="metric-value">1</span><span class="metric-label">file, zero install</span></div>
+    </div>
+    <ul class="bullets">
+      <li>
+        Fully <strong>asynchronous</strong> (<code>async/await</code>,
+        <code>CancellationToken</code>, <code>IProgress&lt;T&gt;</code>) so the UI never
+        blocks during a sweep or a backup.
+      </li>
+      <li>
+        Network service events marshalled onto the UI thread through the
+        <code>Dispatcher</code>, with an <code>INotifyPropertyChanged</code> model so device
+        states update live.
+      </li>
+      <li>ARP table parsing that handles both the Windows and the Linux output formats.</li>
+      <li>
+        Clean split between the UI (<code>MainWindow</code>) and the services
+        (<code>NetworkDiscoveryService</code>, <code>ArpService</code>,
+        <code>PingService</code>, <code>DatabaseService</code>).
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>My role</h2>
+    <p>
+      Built the whole application: UI, network discovery, database export, and packaging.
+    </p>
+  </section>
+
+  <nav class="case-nav">
+    <a href="../index.html#projects" class="btn btn-ghost">&larr; ./all-projects</a>
+    <span class="case-nav-links">
+      <a href="modsecure-mms.html" class="btn btn-ghost">ModSecure MMS &rarr;</a>
+      <a href="ems-platform.html" class="btn btn-ghost">EMS Platform &rarr;</a>
+    </span>
+  </nav>
+
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="branch"><span class="branch-dot" aria-hidden="true"></span>main</span>
+    <span class="statusbar-spacer"></span>
+    <span>UTF-8</span>
+    <span id="year"></span>
+  </div>
+</footer>
+
+<script src="../js/script.js"></script>
+</body>
+</html>

@@ -4,6 +4,7 @@ Site estático (HTML/CSS/JS puro, sem build) pronto para o GitHub Pages.
 
 ## Personalizar
 
+- `projects/*.html` — case studies dos projetos de trabalho (stack, arquitetura, segurança, métricas).
 - `index.html` — texto, nome, projetos, links (procura por "O Teu Nome", "oteu@email.com" e os `href="#"` dos projetos/redes sociais).
 - `css/style.css` — cores no bloco `:root` no topo do ficheiro (tema claro) e no bloco `@media (prefers-color-scheme: dark)` / `[data-theme="dark"]` (tema escuro).
 - `js/script.js` — lógica do botão de tema, não precisa de alterações.

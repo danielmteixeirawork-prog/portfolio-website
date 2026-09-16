@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModSecure MMS — Daniel Teixeira</title>
+<meta name="description" content="Case study: full rewrite of an enterprise DCIM and physical-security platform in React 19, ASP.NET Core .NET 10 and PostgreSQL/TimescaleDB, including a 17.4M-row zero-diff data migration.">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <nav class="tabs">
+      <a href="../index.html#top" class="tab">about.md</a>
+      <a href="../index.html#projects" class="tab">projects.tsx</a>
+      <a href="modsecure-mms.html" class="tab" aria-current="page">modsecure-mms.md</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
+      <span class="theme-icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<main class="case">
+
+  <p class="breadcrumb">
+    <a href="../index.html">~</a><span class="sep">/</span><a href="../index.html#projects">projects</a><span class="sep">/</span>modsecure-mms
+  </p>
+
+  <header class="case-header">
+    <p class="case-kicker">// work project &middot; Maxiglobal</p>
+    <h1 class="case-title">ModSecure MMS</h1>
+    <p class="case-lede">
+      A DCIM and physical-security platform: a complete rewrite of an enterprise
+      data-centre monitoring system with access control and video surveillance.
+    </p>
+    <ul class="case-meta">
+      <li class="is-role">Architecture &amp; full-stack development</li>
+      <li>React 19</li>
+      <li>TypeScript</li>
+      <li>ASP.NET Core (.NET 10)</li>
+      <li>PostgreSQL 17 + TimescaleDB</li>
+      <li>SignalR</li>
+      <li>SNMP / Modbus</li>
+      <li>WebRTC</li>
+    </ul>
+  </header>
+
+  <div class="tldr">
+    <p>
+      <strong>TL;DR —</strong> Rewrite of an enterprise DCIM platform (data-centre
+      monitoring, access control and CCTV) in <strong>React 19 + TypeScript</strong>,
+      <strong>ASP.NET Core .NET 10</strong> and <strong>PostgreSQL/TimescaleDB</strong>.
+      Real-time alarming over SignalR, 2FA (TOTP, email and SMS) on top of Argon2id,
+      SNMP and Modbus collectors, WebRTC video, scheduled PDF reporting, and a
+      17.4M-row migration off the legacy system that validated with zero diffs.
+    </p>
+  </div>
+
+  <section class="case-section">
+    <h2>Overview</h2>
+    <p>
+      MMS (ModSecure Management System) is a <strong>DCIM</strong> (Data Center
+      Infrastructure Management) platform. It brings three concerns into one system:
+    </p>
+    <ul class="bullets">
+      <li><strong>Real-time monitoring</strong> of critical infrastructure: sites, equipment, sensors, readings and alarms.</li>
+      <li><strong>Physical security</strong>: access control, intrusion panels, and CCTV with PTZ and playback.</li>
+      <li><strong>Oversight and administration</strong>: dashboards, video walls, scheduled PDF reports, users and per-site permissions.</li>
+    </ul>
+    <p>
+      The project replaces a legacy product built on ASP.NET Core MVC, Razor, jQuery
+      and MySQL with a modern architecture: a React SPA, a .NET 10 API, background
+      services, and a time-series database. It also ships the tooling needed to
+      migrate the real production data off the old system.
+    </p>
+  </section>
+
+  <section class="case-section">
+    <h2>Stack</h2>
+    <table class="stack-table">
+      <tbody>
+        <tr>
+          <th scope="row">Frontend</th>
+          <td>React 19, TypeScript, Vite 8, Tailwind CSS 4, TanStack Query, React Router 7, Chart.js, SignalR client, Vitest + Testing Library</td>
+        </tr>
+        <tr>
+          <th scope="row">Backend</th>
+          <td>C# / ASP.NET Core (.NET 10) with Minimal APIs, EF Core (mapping only), Npgsql, SignalR, Serilog</td>
+        </tr>
+        <tr>
+          <th scope="row">Database</th>
+          <td>PostgreSQL 17 with TimescaleDB — hypertables, compression, continuous aggregates and jobs; SQL-first versioned schema with DbUp</td>
+        </tr>
+        <tr>
+          <th scope="row">Services</th>
+          <td>Worker Service (Windows Service) and industrial protocol collectors</td>
+        </tr>
+        <tr>
+          <th scope="row">Protocols</th>
+          <td>SNMP v1/v2c/v3 (SharpSnmpLib), Modbus TCP/RTU (FluentModbus), Hikvision SDK, WebRTC/WHEP via MediaMTX</td>
+        </tr>
+        <tr>
+          <th scope="row">Reporting</th>
+          <td>Playwright with headless Chromium for PDF generation, delivered by email with MailKit</td>
+        </tr>
+        <tr>
+          <th scope="row">Infrastructure</th>
+          <td>IIS on Windows Server, PowerShell scripts for install / publish / backup, CI on GitHub Actions</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="case-section">
+    <h2>Architecture</h2>
+    <pre class="diagram">React SPA ──HTTP/SignalR──▶ Mms.Api (IIS)
+                               │
+                               ▼
+                     PostgreSQL + TimescaleDB ◀── Mms.Worker (Windows Service)
+                               ▲                  alarms · notifications · reports · weekly plans
+                               │
+             Collectors (SNMP, Modbus, Hikvision…) via Mms.Collector.Sdk</pre>
+    <ul class="bullets">
+      <li>
+        <strong>Clean Architecture</strong> across separate projects: <code>Core</code>
+        (pure, testable domain rules), <code>Infrastructure</code>, <code>Security</code>,
+        <code>Api</code>, <code>Worker</code>, <code>Migrator</code> and <code>Collector.Sdk</code>.
+      </li>
+      <li>
+        <strong>A purpose-built collector SDK</strong>: readings are batched every 20 s.
+        While the database is unreachable they are buffered on disk and replayed in order.
+        The SDK also owns the heartbeat and hot-reloads configuration through PostgreSQL
+        <code>LISTEN/NOTIFY</code>.
+      </li>
+      <li>
+        <strong>A database-backed command queue</strong> for talking to devices — opening
+        doors, arming intrusion, PTZ, writing set-points. It replaces the legacy named
+        pipes and lets the API and the collectors live on different machines.
+      </li>
+      <li>
+        <strong>Real time end to end</strong>: a PostgreSQL trigger fires <code>NOTIFY</code>,
+        the API listens, SignalR pushes to the browser, and the browser invalidates the
+        matching TanStack Query caches.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Authentication &amp; security</h2>
+    <ul class="bullets">
+      <li>Passwords hashed with <strong>Argon2id</strong> (PHC string format), with account lockout after repeated failures.</li>
+      <li><strong>Server-side sessions</strong> in an HttpOnly cookie, validated against the database on every request, expiring on inactivity and revocable on demand.</li>
+      <li><strong>User-selectable 2FA</strong>: email, SMS or authenticator app (TOTP with QR enrolment), plus recovery codes.</li>
+      <li><strong>CSRF protection</strong> (antiforgery via the <code>X-XSRF-TOKEN</code> header) and per-IP rate limiting.</li>
+      <li><strong>Per-area and per-site permissions</strong>, with user groups, user impersonation, and an audit log of every action down to the changed fields.</li>
+      <li><strong>Secrets encrypted</strong> with ASP.NET Data Protection — device passwords, PINs, SMTP credentials and TOTP secrets. The key ring lives in the database, protected by a certificate; secrets are never returned to the client.</li>
+      <li>Password recovery and invitations via single-use links, and a maintenance mode with an IP allow-list.</li>
+      <li>Uploads validated by type and size, SVG rejected, served with <code>nosniff</code>.</li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Technical highlights</h2>
+    <div class="metrics">
+      <div class="metric"><span class="metric-value">17.4M</span><span class="metric-label">rows migrated in 6.5 min</span></div>
+      <div class="metric"><span class="metric-value">0</span><span class="metric-label">diffs on migration validation</span></div>
+      <div class="metric"><span class="metric-value">~25×</span><span class="metric-label">time-series compression</span></div>
+      <div class="metric"><span class="metric-value">20 s</span><span class="metric-label">sampling interval</span></div>
+    </div>
+    <ul class="bullets">
+      <li>
+        <strong>Time series at scale</strong>: 20 s sampling, roughly 25× compression
+        (≈ 4.8 bytes per sample), 15-minute and 1-hour aggregates kept forever, and two
+        years of raw data. Queries pick their source from the requested range — raw,
+        15 min, 1 h, or the daily rollup table.
+      </li>
+      <li>
+        <strong>Time zones done properly</strong>: customers span different zones,
+        including half-hour offsets (+05:30). Days, months and schedules are computed in
+        each site's own zone, with tests covering DST transitions.
+      </li>
+      <li>
+        <strong>Alarm engine</strong>: thresholds evaluated every 2 s, offline-equipment
+        detection, and suppression windows. Email and SMS notifications go out through an
+        outbox with retries and backoff, and delivery is safe across multiple Workers
+        using <code>FOR UPDATE SKIP LOCKED</code>.
+      </li>
+      <li>
+        <strong>Video in the browser</strong> over WebRTC (WHEP), with the API acting as
+        the broker that enforces per-site permissions.
+      </li>
+      <li>
+        <strong>Reporting</strong> with 10 block types (charts, KPIs, MTTA, availability,
+        consumption), scheduled in the customer's time zone and delivered as PDF by email.
+      </li>
+      <li>
+        <strong>Legacy migration</strong>: an importer that reads MySQL directly or
+        straight from a mysqldump file, loading through binary <code>COPY</code>. Imports
+        are idempotent — re-running never duplicates. A real dry run moved
+        <strong>17.4M records (24.5M points) in 6.5 minutes</strong>, and sensor-by-sensor,
+        day-by-day validation came back with <strong>zero differences</strong>. A cutover
+        runbook ships with it.
+      </li>
+      <li>
+        <strong>Industrial collectors</strong> for SNMP and Modbus running as Windows
+        Services, covering every numeric format and byte order, and grouping registers
+        into block reads.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Quality</h2>
+    <div class="metrics">
+      <div class="metric"><span class="metric-value">~320</span><span class="metric-label">automated tests</span></div>
+      <div class="metric"><span class="metric-value">240</span><span class="metric-label">backend (unit + integration)</span></div>
+      <div class="metric"><span class="metric-value">79</span><span class="metric-label">frontend</span></div>
+      <div class="metric"><span class="metric-value">25</span><span class="metric-label">versioned SQL migrations</span></div>
+    </div>
+    <ul class="bullets">
+      <li>Backend integration tests run against real PostgreSQL and TimescaleDB instances, not fakes.</li>
+      <li>Warning-free builds (warnings as errors), centrally managed package versions, and CI that spins up TimescaleDB in a container.</li>
+      <li>25 versioned SQL migrations plus install, backup and restore scripts.</li>
+      <li>Interface localised in Portuguese and English.</li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>My role</h2>
+    <p>
+      End-to-end architecture and full-stack development: database modelling, API,
+      authentication, background services, collectors, frontend, data migration and
+      deployment scripting.
+    </p>
+  </section>
+
+  <nav class="case-nav">
+    <a href="../index.html#projects" class="btn btn-ghost">&larr; ./all-projects</a>
+    <span class="case-nav-links">
+      <a href="ems-platform.html" class="btn btn-ghost">EMS Platform &rarr;</a>
+      <a href="gt-gest.html" class="btn btn-ghost">Gt Gest &rarr;</a>
+    </span>
+  </nav>
+
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="branch"><span class="branch-dot" aria-hidden="true"></span>main</span>
+    <span class="statusbar-spacer"></span>
+    <span>UTF-8</span>
+    <span id="year"></span>
+  </div>
+</footer>
+
+<script src="../js/script.js"></script>
+</body>
+</html>

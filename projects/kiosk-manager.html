@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kiosk Manager — Daniel Teixeira</title>
+<meta name="description" content="Case study: a cross-platform Avalonia desktop app on .NET 10 for fleet-managing kiosk display boards, paired with a dependency-free Python agent exposing a token-authenticated REST API instead of SSH.">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <nav class="tabs">
+      <a href="../index.html#top" class="tab">about.md</a>
+      <a href="../index.html#projects" class="tab">projects.tsx</a>
+      <a href="kiosk-manager.html" class="tab" aria-current="page">kiosk-manager.md</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
+      <span class="theme-icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<main class="case">
+
+  <p class="breadcrumb">
+    <a href="../index.html">~</a><span class="sep">/</span><a href="../index.html#projects">projects</a><span class="sep">/</span>kiosk-manager
+  </p>
+
+  <header class="case-header">
+    <p class="case-kicker">// work project &middot; Maxiglobal</p>
+    <h1 class="case-title">Kiosk Manager</h1>
+    <p class="case-lede">
+      Fleet device management for the physical kiosk boards that display
+      <a href="ems-platform.html">EMS</a> dashboards on-site — discover them, provision
+      them, and administer them remotely, from Windows, Linux or macOS.
+    </p>
+    <ul class="case-meta">
+      <li class="is-role">Sole developer</li>
+      <li>.NET 10</li>
+      <li>Avalonia UI</li>
+      <li>MVVM</li>
+      <li>Python agent</li>
+      <li>SSH.NET</li>
+      <li>Cross-platform</li>
+    </ul>
+  </header>
+
+  <div class="tldr">
+    <p>
+      <strong>TL;DR —</strong> A cross-platform <strong>Avalonia</strong> desktop client on
+      <strong>.NET 10</strong>, paired with a dependency-free <strong>Python agent</strong>
+      running as a root systemd unit on each board. Management deliberately happens over a
+      <strong>bearer-token REST API instead of SSH</strong>, because the boards ship with a
+      shared unprivileged factory login. Boards are found by UDP broadcast or by CIDR scan,
+      and the provisioning scripts are embedded in the executable so a technician needs
+      nothing but the binary.
+    </p>
+  </div>
+
+  <section class="case-section">
+    <h2>Overview</h2>
+    <p>
+      Kiosk Manager is a separate application with its own git repository and its own
+      release cycle. It discovers and remotely administers the physical kiosk display
+      boards that run EMS dashboards on-site: Debian 11 ARM64 Rockchip single-board
+      computers running a fullscreen Chromium kiosk.
+    </p>
+  </section>
+
+  <section class="case-section">
+    <h2>Why it is two pieces</h2>
+    <p>
+      Management deliberately <strong>does not</strong> happen over SSH. The boards' SSH
+      account is a shared, unprivileged factory-default login that cannot touch network
+      configuration, the certificate store, or the kiosk config file. So the design splits
+      in two:
+    </p>
+    <pre class="diagram">KioskManager.App   (Avalonia · Windows / Linux / macOS)
+      │
+      ├─ discovery ──┬─ UDP broadcast              instant, local L2 segment only
+      │              └─ CIDR scan + SSH identity   works across routed subnets
+      │
+      ├─ provisioning (one time only) ──SSH / SCP──▶ board
+      │      embedded resources: setup-kiosk.sh · install-agent.sh · kiosk_agent.py
+      │
+      └─ management (everything else) ──HTTP + bearer token──▶ kiosk_agent.py
+                                                                 (root systemd unit)
+                                                                  ├─ status
+                                                                  ├─ kiosk URL / cert / network
+                                                                  └─ reboot · refresh ·
+                                                                     clear cache · shutdown
+
+board: Debian 11 ARM64 (Rockchip SBC) ─▶ fullscreen Chromium ─▶ EMS dashboard</pre>
+    <ul class="bullets">
+      <li>
+        <strong><code>board-agent/kiosk_agent.py</code></strong> — a dependency-free Python
+        HTTP service running as a root systemd unit on each board, exposing a
+        bearer-token-authenticated REST API for status, kiosk URL / certificate / network
+        configuration, and remote commands (reboot, browser refresh, cache clear, shutdown).
+      </li>
+      <li>
+        <strong><code>KioskManager.App</code></strong> — the desktop client. Every read and
+        write against a board goes through that HTTP API; SSH is used only for the one-time
+        provisioning flow.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Tech stack</h2>
+    <table class="stack-table">
+      <tbody>
+        <tr>
+          <th scope="row">Desktop client</th>
+          <td>.NET 10 with <strong>Avalonia UI</strong> (cross-platform XAML), Fluent theme — verified end to end on Linux, Windows and macOS</td>
+        </tr>
+        <tr>
+          <th scope="row">Pattern</th>
+          <td>CommunityToolkit.Mvvm — ViewModels, commands, observable properties</td>
+        </tr>
+        <tr>
+          <th scope="row">Provisioning</th>
+          <td>SSH.NET for the SSH/SCP first-time flow</td>
+        </tr>
+        <tr>
+          <th scope="row">Board agent</th>
+          <td>Python, standard library only, running as a root systemd unit</td>
+        </tr>
+        <tr>
+          <th scope="row">Distribution</th>
+          <td>Self-contained single-file <code>dotnet publish</code> for linux-x64 and win-x64, shipped as GitHub Releases rather than committed binaries</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="case-section">
+    <h2>Technical highlights</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Two independent discovery methods</strong>: a UDP broadcast — the same idea
+        as Hikvision's SADP tool: instant, but limited to the local L2 segment — and a
+        CIDR-range scan with an SSH identity check, which works across routed subnets.
+      </li>
+      <li>
+        <strong>Provisioning scripts embedded as resources</strong> in the compiled
+        executable rather than referenced from disk, so a technician can run a
+        self-contained build against a brand-new board without the source tree present.
+      </li>
+      <li>
+        <strong>Least privilege by design</strong>: rather than hand out a privileged SSH
+        account, the narrow set of operations that genuinely need root is exposed through
+        one authenticated API surface on the board.
+      </li>
+      <li>
+        <strong>No runtime to install</strong> on the administrator's machine — single-file
+        self-contained builds for both Linux and Windows.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Structure</h2>
+    <pre class="diagram">KioskManager/Development/
+├── board-agent/       kiosk_agent.py, setup-kiosk.sh, install-agent.sh, systemd unit
+└── src/KioskManager.App/
+    ├── Views/         Avalonia XAML views
+    ├── ViewModels/    MVVM view models (CommunityToolkit.Mvvm)
+    ├── Models/, Services/
+    └── Assets/</pre>
+  </section>
+
+  <section class="case-section">
+    <h2>My role</h2>
+    <p>
+      Sole developer: the desktop client, the board agent and its provisioning scripts, the
+      discovery mechanisms, and the release packaging for both platforms.
+    </p>
+  </section>
+
+  <nav class="case-nav">
+    <a href="../index.html#projects" class="btn btn-ghost">&larr; ./all-projects</a>
+    <span class="case-nav-links">
+      <a href="ems-discovery.html" class="btn btn-ghost">EMS Discovery &rarr;</a>
+      <a href="modsecure-mms.html" class="btn btn-ghost">ModSecure MMS &rarr;</a>
+    </span>
+  </nav>
+
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="branch"><span class="branch-dot" aria-hidden="true"></span>main</span>
+    <span class="statusbar-spacer"></span>
+    <span>UTF-8</span>
+    <span id="year"></span>
+  </div>
+</footer>
+
+<script src="../js/script.js"></script>
+</body>
+</html>
