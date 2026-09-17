@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MMS Clean Backup — Daniel Teixeira</title>
+<meta name="description" content="Case study: a PowerShell field tool that takes consistent, configuration-complete MySQL/MariaDB backups of MMS installations without their history tables, restores them under any name, and ships as a single executable.">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <nav class="tabs">
+      <a href="../index.html#top" class="tab">about.md</a>
+      <a href="../index.html#projects" class="tab">projects.tsx</a>
+      <a href="mms-clean-backup.html" class="tab" aria-current="page">mms-clean-backup.md</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
+      <span class="theme-icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<main class="case">
+
+  <p class="breadcrumb">
+    <a href="../index.html">~</a><span class="sep">/</span><a href="../index.html#projects">projects</a><span class="sep">/</span>mms-clean-backup
+  </p>
+
+  <header class="case-header">
+    <p class="case-kicker">// work project &middot; Maxiglobal</p>
+    <h1 class="case-title">MMS Clean Backup</h1>
+    <p class="case-lede">
+      A field tool that takes a portable, configuration-complete copy of an MMS
+      installation's database — without its history — so a system can be cloned, moved or
+      reproduced in minutes.
+    </p>
+    <ul class="case-meta">
+      <li class="is-role">Design &amp; sole developer</li>
+      <li>PowerShell</li>
+      <li>MySQL / MariaDB</li>
+      <li>mysqldump</li>
+      <li>PS2EXE</li>
+      <li>Windows</li>
+    </ul>
+  </header>
+
+  <div class="tldr">
+    <p>
+      <strong>TL;DR —</strong> A full dump of a production MMS database is dominated by years
+      of sensor readings, alarm history and access logs — slow to move and irrelevant for
+      most support work. This tool produces a <strong>cleaned backup</strong>: every table,
+      routine, trigger and event, plus all configuration data, with seven operational tables
+      exported <strong>structure-only</strong>. The live database is <strong>never
+      modified</strong>: the copy is taken in a consistent <strong>single transaction</strong>,
+      dumped in <strong>two ordered passes</strong> so it always re-imports cleanly, and can
+      be <strong>restored under any database name</strong> side by side with the original.
+      Works with <strong>MySQL and MariaDB</strong>, and ships as a <strong>single 37 KB
+      executable</strong> with a config file and bilingual instructions.
+    </p>
+  </div>
+
+  <section class="case-section">
+    <h2>Overview</h2>
+    <p>The tool exposes three operations from a simple console menu:</p>
+    <ul class="bullets">
+      <li><strong>(1) Create backup</strong> — cleaned <code>.sql</code> dump; the live database is unchanged.</li>
+      <li><strong>(2) Create database and import a dump</strong> — restore any dump into a new database.</li>
+      <li><strong>(3) Backup, then restore</strong> — clone an installation into a new database in one go (e.g. a test copy on the same server).</li>
+    </ul>
+    <p>
+      Typical uses: preparing a staging or test environment, moving an installation to a new
+      server, reproducing a customer issue on a bench machine, and taking a lightweight
+      configuration backup before a risky change.
+    </p>
+  </section>
+
+  <section class="case-section">
+    <h2>What "clean" means</h2>
+    <pre class="diagram">FULL DATA  (configuration)                STRUCTURE ONLY  (operational history)
+────────────────────────────────          ──────────────────────────────────────
+sites, equipment, sensors,                sensor_readings        alarm
+parameters, alarm rules, users,           alarm_ignore           action_log
+notification settings, client, …          notification_to_process
++ routines · triggers · events            notification_error     access_log</pre>
+    <p>
+      Everything needed to bring an installation back up is kept; only the tables that grow
+      without bound are emptied — and they still exist in the backup, so the restored database
+      is structurally complete and fully functional.
+    </p>
+  </section>
+
+  <section class="case-section">
+    <h2>How the backup works</h2>
+    <pre class="diagram">MMSBackup.exe
+  ├─ read config.json (or defaults) → prompt for password if not configured
+  ├─ SELECT name FROM client  →  {client}_mmsCleanBackup_{yyyyMMdd_HHmmss}.sql
+  │
+  ├─ pass 1: mysqldump --single-transaction --no-data  &lt;7 operational tables&gt;
+  │            └─ raw stdout stream ──▶ backup.sql  (create)
+  │
+  └─ pass 2: mysqldump --single-transaction --routines --triggers --events
+               --ignore-table=&lt;each of the 7&gt;  &lt;database&gt;
+               └─ raw stdout stream ──▶ backup.sql  (append)</pre>
+    <ul class="bullets">
+      <li>
+        <strong>Ordering is deliberate</strong> — the empty table structures are written
+        first, so the triggers and foreign keys in the rest of the dump can reference them at
+        import time.
+      </li>
+      <li>
+        <strong>Consistent without locking</strong> — <code>--single-transaction</code> takes an
+        InnoDB snapshot, so the backup runs against a live system without blocking the
+        services writing to it.
+      </li>
+      <li>
+        <strong>Binary-safe output</strong> — mysqldump's stdout is copied byte for byte from
+        the process's base stream straight into the file, bypassing PowerShell's text
+        pipeline and redirection, which would re-encode the dump and can corrupt UTF-8 data.
+      </li>
+      <li>
+        <strong>Fails loudly</strong> — each pass checks the exit code, captures stderr, and
+        rejects an empty output file.
+      </li>
+      <li>
+        <strong>Meaningful file names</strong> — the customer name is read from the
+        <code>client</code> table, sanitised, and combined with a timestamp.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>How the restore works</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Creates the target database</strong> with <code>utf8mb4</code> /
+        <code>utf8mb4_unicode_ci</code>.
+      </li>
+      <li>
+        <strong>Restores under any name</strong> — the dump's <code>USE</code> statements are
+        rewritten to the new database, so a copy like <code>mms_test</code> can live next to
+        the original without touching it.
+      </li>
+      <li>
+        <strong>Imports</strong> through the <code>mysql</code> client, then
+        <strong>verifies</strong> the result by counting tables in
+        <code>information_schema</code>.
+      </li>
+      <li>
+        <strong>Handles trigger side effects</strong> — because triggers can fire during import
+        and insert rows into the cleaned tables, the tool offers to truncate those seven tables
+        again, with foreign-key checks temporarily disabled.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Built for technicians</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Single executable</strong> — the script is compiled with
+        <strong>PS2EXE</strong> into <code>MMSBackup.exe</code>. A build script installs the
+        module if needed, builds, and copies the result into a <code>publish\</code> folder
+        ready to hand out.
+      </li>
+      <li>
+        <strong>Configurable per site</strong> — <code>config.json</code> sets the client-tools
+        path, backup folder, host, port, user, password and default database, so it works
+        with any <strong>MySQL or MariaDB</strong> installation, local or remote. Only
+        non-default host and port are passed on.
+      </li>
+      <li>
+        <strong>No stored secrets by default</strong> — when no password is configured, it is
+        requested at runtime through a secure prompt.
+      </li>
+      <li>
+        <strong>Friendly failure handling</strong> — a global trap shows the error and keeps
+        the window open, ignores mysql's benign "password on the command line" warning, and
+        falls back to a sensible working folder when running as an executable (where
+        <code>$PSScriptRoot</code> is empty).
+      </li>
+      <li>
+        <strong>Bilingual instructions</strong> — English and Portuguese usage guides ship in
+        the publish folder.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>What this project demonstrates</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Understanding the data, not just dumping it</strong> — knowing which tables
+        carry configuration versus history, and how triggers and foreign keys constrain
+        restore order.
+      </li>
+      <li>
+        <strong>Safety first</strong> — read-only, consistent snapshots of a live production
+        database, and restores that never overwrite the source.
+      </li>
+      <li>
+        <strong>Careful process handling</strong> — raw byte streaming, exit-code checks and
+        stderr capture around external CLI tools.
+      </li>
+      <li>
+        <strong>Operational empathy</strong> — a menu-driven, single-file tool that
+        non-developers can run safely in the field.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>My role</h2>
+    <p>
+      Sole developer: backup strategy and table selection, the dump and restore logic,
+      packaging and build pipeline, and the end-user documentation.
+    </p>
+  </section>
+
+  <nav class="case-nav">
+    <a href="../index.html#projects" class="btn btn-ghost">&larr; ./all-projects</a>
+    <span class="case-nav-links">
+      <a href="mms-config-export.html" class="btn btn-ghost">MMS Configuration Export &rarr;</a>
+      <a href="modsecure-mms.html" class="btn btn-ghost">ModSecure MMS &rarr;</a>
+    </span>
+  </nav>
+
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="branch"><span class="branch-dot" aria-hidden="true"></span>main</span>
+    <span class="statusbar-spacer"></span>
+    <span>UTF-8</span>
+    <span id="year"></span>
+  </div>
+</footer>
+
+<script src="../js/script.js"></script>
+</body>
+</html>

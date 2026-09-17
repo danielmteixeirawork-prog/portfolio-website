@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MMS Configuration Export — Daniel Teixeira</title>
+<meta name="description" content="Case study: a Python tool packaged as a single Windows executable that turns an MMS MySQL/MariaDB database into commissioning documentation — per-site sensor protocol tables, an equipment inventory with ARP-resolved MACs, and an alarm trigger matrix.">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <nav class="tabs">
+      <a href="../index.html#top" class="tab">about.md</a>
+      <a href="../index.html#projects" class="tab">projects.tsx</a>
+      <a href="mms-config-export.html" class="tab" aria-current="page">mms-config-export.md</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
+      <span class="theme-icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<main class="case">
+
+  <p class="breadcrumb">
+    <a href="../index.html">~</a><span class="sep">/</span><a href="../index.html#projects">projects</a><span class="sep">/</span>mms-config-export
+  </p>
+
+  <header class="case-header">
+    <p class="case-kicker">// work project &middot; Maxiglobal</p>
+    <h1 class="case-title">MMS Configuration Export</h1>
+    <p class="case-lede">
+      A one-click tool that reads an MMS installation's database and produces the
+      documentation technicians and customers actually need — sites, equipment, sensor
+      protocol settings, inventory and alarm rules — as formatted Excel workbooks.
+    </p>
+    <ul class="case-meta">
+      <li class="is-role">Design &amp; sole developer</li>
+      <li>Python 3</li>
+      <li>openpyxl</li>
+      <li>mysql-connector-python</li>
+      <li>MySQL / MariaDB</li>
+      <li>PyInstaller</li>
+    </ul>
+  </header>
+
+  <div class="tldr">
+    <p>
+      <strong>TL;DR —</strong> An MMS installation's configuration is spread across dozens of
+      related tables, with protocol settings stored as generic key-value rows per sensor.
+      This tool connects to the <strong>MySQL or MariaDB</strong> database and produces
+      <strong>three formatted workbooks and an image folder</strong>: a per-site
+      configuration workbook that <strong>pivots each sensor's protocol parameters into
+      columns</strong>, an equipment inventory with <strong>MAC addresses resolved from the
+      local ARP table</strong>, and an <strong>alarm trigger matrix</strong> that describes
+      rules exactly as the alarm engine evaluates them. It adapts to the schema it finds, logs
+      every step, and ships as a <strong>single PyInstaller executable</strong> — nothing to
+      install on the technician's PC.
+    </p>
+  </div>
+
+  <section class="case-section">
+    <h2>Overview</h2>
+    <p>
+      Commissioning, audits, handovers and migrations all need the same thing: an accurate,
+      readable picture of how an installation is configured. Getting it from the MMS UI means
+      clicking through every site and sensor; getting it from the database means knowing the
+      schema. This tool does it in one run, straight from the source of truth:
+    </p>
+    <pre class="diagram">MMS_Export.exe  (+ optional config.json)
+   │
+   ├─▶ {Client}_mms.xlsx          client config · users · one sheet per site
+   ├─▶ Equipments_{Client}.xlsx   flat equipment inventory (+ MAC from ARP)
+   ├─▶ Triggers_{Client}.xlsx     alarm rules per equipment and sensor
+   └─▶ {Client}_mms_images/       site images per site  +  SiteGroups/</pre>
+  </section>
+
+  <section class="case-section">
+    <h2>Tech stack</h2>
+    <table class="stack-table">
+      <tbody>
+        <tr>
+          <th scope="row">Language</th>
+          <td>Python 3</td>
+        </tr>
+        <tr>
+          <th scope="row">Database</th>
+          <td>MySQL or MariaDB via mysql-connector-python (pure-Python mode)</td>
+        </tr>
+        <tr>
+          <th scope="row">Excel</th>
+          <td>openpyxl — styled tables, frozen panes, internal hyperlinks, wrapped multi-line cells</td>
+        </tr>
+        <tr>
+          <th scope="row">Packaging</th>
+          <td>PyInstaller single-file console executable with a custom <code>.spec</code></td>
+        </tr>
+        <tr>
+          <th scope="row">Tooling</th>
+          <td>Schema-inspection helper scripts used to map the MMS database</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="case-section">
+    <h2>The workbooks</h2>
+
+    <h3>1. Configuration workbook — <code>{Client}_mms.xlsx</code></h3>
+    <ul class="bullets">
+      <li>
+        <strong>Client Config sheet</strong> — SMTP email and GSM/SMS gateway settings with
+        human-readable labels (internal timer keys excluded), followed by the user list with
+        Yes/No flags.
+      </li>
+      <li>
+        <strong>One sheet per site</strong> — site details (site group and parent resolved to
+        names, not IDs), then for each equipment a details table and a <strong>sensor
+        configuration table</strong>.
+      </li>
+      <li>
+        <strong>Navigation</strong> — a "Jump to equipment" row of internal hyperlinks at the
+        top of each site sheet, for sites with many devices.
+      </li>
+    </ul>
+
+    <h3>2. Equipment inventory — <code>Equipments_{Client}.xlsx</code></h3>
+    <ul class="bullets">
+      <li>One row per device: name, IP, model, serial number, firmware and <strong>MAC address</strong>.</li>
+      <li>Empty username and password columns for technicians to complete on site — the file doubles as a commissioning checklist.</li>
+    </ul>
+
+    <h3>3. Alarm trigger matrix — <code>Triggers_{Client}.xlsx</code></h3>
+    <ul class="bullets">
+      <li>
+        One section per equipment (with site and type), one row per sensor, and
+        <strong>every trigger listed on its own line</strong> in the same cell — e.g.
+        <code>Value range: -∞ to 10 (Warning)</code>, <code>Bit 3 = 1 (Critical)</code>.
+      </li>
+      <li>
+        <strong>Faithful to the alarm engine</strong> — an open (NULL) lower or upper bound
+        is shown as <code>-∞</code> / <code>∞</code>, because that is how the engine
+        evaluates it; a blank would suggest a limit that doesn't exist.
+      </li>
+      <li>
+        Common Portuguese severity names are translated to English, sensors without rules are
+        flagged as "No trigger configured", camera equipment is excluded, and row heights grow
+        with the number of rules.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Pivoting key-value data into columns</h2>
+    <p>
+      MMS stores protocol settings generically: each reading type (SNMP, Modbus, Siemens S7,
+      Hikvision, access control…) defines its own parameter types, and each sensor stores
+      values against them. The export turns that into readable columns:
+    </p>
+    <ul class="bullets">
+      <li>
+        <strong>Fixed columns</strong> for every sensor — name, sensor type, port, IP, reading
+        type and UI/graph display settings.
+      </li>
+      <li>
+        <strong>Dynamic columns</strong> — one per parameter used by that equipment's reading
+        types, in the platform's defined order: SNMP <em>OID, format, conversion</em>; Modbus
+        <em>register, function code</em>; Siemens S7 <em>DB number, formula</em>; Hikvision
+        <em>channel, RTSP and playback paths</em>; access control <em>readers, door
+        number</em>.
+      </li>
+      <li>
+        <strong>Values matched by reading type as well as name</strong>, so identically named
+        parameters from different protocols never bleed into each other.
+      </li>
+      <li>
+        <strong>Readable headers</strong> — internal parameter names map to friendly labels;
+        unknown names pass through unchanged, so new protocols still export correctly.
+      </li>
+      <li>
+        <strong>Batched queries</strong> — parameter types and values are loaded once per
+        equipment with parameterised <code>IN (…)</code> queries, not per sensor.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>MAC resolution without network scanning</h2>
+    <ul class="bullets">
+      <li>
+        The local ARP table (<code>arp -a</code> on Windows, <code>arp -n</code> elsewhere) is
+        <strong>parsed once and cached</strong>, then each equipment IP is looked up in it.
+      </li>
+      <li>
+        <strong>No pings, no ARP requests</strong> — the export generates no traffic on the
+        customer network and stays fast; MACs appear for devices the PC has recently talked to.
+      </li>
+      <li>It can be switched off entirely with <code>resolve_mac</code> in the config.</li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Robust across installations</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Schema-tolerant</strong> — each section checks that its tables exist and
+        degrades with a clear note in the workbook, so older or partial databases still
+        export.
+      </li>
+      <li>
+        <strong>Schema knowledge in one place</strong> — all table and column names are
+        constants at the top of the script, so adapting to a schema variant is a contained
+        change.
+      </li>
+      <li>
+        <strong>Soft-delete aware</strong> — deleted sites, equipment and sensors are excluded
+        consistently, including NULL delete flags.
+      </li>
+      <li>
+        <strong>Handles MySQL <code>BIT</code> columns</strong>, which arrive as bytes, and
+        renders them correctly as Yes/No.
+      </li>
+      <li>
+        <strong>File-system safe</strong> — client, site and folder names are sanitised for
+        Windows, and sheet names respect Excel's 31-character and character rules.
+      </li>
+      <li>
+        <strong>Collects images</strong> — site and site-group images are copied from the web
+        application's image folders (configurable paths) into one folder per site, ready for
+        handover.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Packaging &amp; diagnostics</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Single executable</strong> — PyInstaller with a custom <code>.spec</code>.
+        mysql-connector loads its authentication plugins and locale modules by name at
+        runtime, which static analysis misses, so they are collected explicitly as hidden
+        imports.
+      </li>
+      <li>
+        <strong>Sidesteps a known Windows failure</strong> — the connector runs in pure-Python
+        mode (<code>use_pure=True</code>) to avoid error 2059, where the C extension cannot
+        load the <code>mysql_native_password</code> plugin DLL.
+      </li>
+      <li>
+        <strong>Portable configuration</strong> — an optional <code>config.json</code> next to
+        the executable overrides connection, image paths and MAC resolution.
+      </li>
+      <li>
+        <strong>Field-debuggable</strong> — step-by-step progress to the console and to a
+        timestamped <code>mms_export_log.txt</code>; on failure the full traceback is logged
+        and the window waits for Enter instead of vanishing.
+      </li>
+      <li>
+        <strong>Distribution</strong> — a build script produces the executable and copies it
+        into a <code>publish\</code> folder with English and Portuguese instructions.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>What this project demonstrates</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Data-modelling fluency</strong> — navigating a large relational schema and
+        pivoting key-value storage into a readable, per-protocol layout.
+      </li>
+      <li>
+        <strong>Semantic accuracy</strong> — documenting alarm rules as the engine evaluates
+        them, not just as the columns store them.
+      </li>
+      <li>
+        <strong>Documentation as a product</strong> — output formatted for the technicians and
+        customers who will actually use it.
+      </li>
+      <li>
+        <strong>Shipping Python to non-developers</strong> — single-file packaging, runtime
+        dependency pitfalls handled, and diagnostics that work without a developer present.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>My role</h2>
+    <p>
+      Sole developer: schema analysis, export design and workbook layouts, the
+      parameter-pivot logic, MAC resolution, packaging and build pipeline, and user
+      documentation.
+    </p>
+  </section>
+
+  <nav class="case-nav">
+    <a href="../index.html#projects" class="btn btn-ghost">&larr; ./all-projects</a>
+    <span class="case-nav-links">
+      <a href="modsecure-mms.html" class="btn btn-ghost">ModSecure MMS &rarr;</a>
+      <a href="ems-platform.html" class="btn btn-ghost">EMS Platform &rarr;</a>
+    </span>
+  </nav>
+
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="branch"><span class="branch-dot" aria-hidden="true"></span>main</span>
+    <span class="statusbar-spacer"></span>
+    <span>UTF-8</span>
+    <span id="year"></span>
+  </div>
+</footer>
+
+<script src="../js/script.js"></script>
+</body>
+</html>
