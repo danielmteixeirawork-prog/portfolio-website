@@ -16,7 +16,7 @@ deployed on GitHub Pages.
 
 ### Case studies
 
-- [`projects/modsecure-mms.html`](projects/modsecure-mms.html) — DCIM and physical-security platform
+- [`projects/mms-platform.html`](projects/mms-platform.html) — DCIM and physical-security platform
 - [`projects/ems-platform.html`](projects/ems-platform.html) — multi-site infrastructure monitoring platform
 - [`projects/gt-gest.html`](projects/gt-gest.html) — internal stock, tasks and customer management
 - [`projects/kiosk-manager.html`](projects/kiosk-manager.html) — kiosk fleet device management
