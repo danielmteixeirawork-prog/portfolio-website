@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MMS SNMP Agent — Daniel Teixeira</title>
+<meta name="description" content="Case study: a .NET 8 Windows service that exposes live MMS sensor readings over SNMP v1/v2c — hand-built GET/GETNEXT/GETBULK responder, lock-free immutable snapshots, resilient MySQL/MariaDB refresh, and generated Excel OID documentation.">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <nav class="tabs">
+      <a href="../index.html#top" class="tab">about.md</a>
+      <a href="../index.html#projects" class="tab">projects.tsx</a>
+      <a href="mms-snmp-agent.html" class="tab" aria-current="page">mms-snmp-agent.md</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
+      <span class="theme-icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<main class="case">
+
+  <p class="breadcrumb">
+    <a href="../index.html">~</a><span class="sep">/</span><a href="../index.html#projects">projects</a><span class="sep">/</span>mms-snmp-agent
+  </p>
+
+  <header class="case-header">
+    <p class="case-kicker">// work project &middot; Maxiglobal</p>
+    <h1 class="case-title">MMS SNMP Agent</h1>
+    <p class="case-lede">
+      A small, always-on integration service that turns the MMS platform's sensor database
+      into a standard SNMP agent — so any network management system can poll live readings
+      without touching the database or the MMS UI.
+    </p>
+    <ul class="case-meta">
+      <li class="is-role">Design &amp; sole developer</li>
+      <li>C# / .NET 8</li>
+      <li>Worker Service</li>
+      <li>Windows Service</li>
+      <li>SNMP v1 / v2c</li>
+      <li>MySQL / MariaDB</li>
+      <li>ClosedXML</li>
+      <li>PowerShell</li>
+    </ul>
+  </header>
+
+  <div class="tldr">
+    <p>
+      <strong>TL;DR —</strong> Built for a customer who wanted MMS sensor data inside their
+      own NMS, and designed to be reused on any MMS deployment. A <strong>.NET 8 Worker
+      Service</strong>, running as a Windows service, loads every active sensor into an
+      <strong>immutable, sorted OID snapshot</strong> every 15 s and answers
+      <strong>GET, GETNEXT and GETBULK</strong> requests from it over UDP — the SNMP handling
+      is written directly on the socket. It works against both <strong>MySQL and
+      MariaDB</strong>, is hardened for 24/7 unattended operation (self-restarting loops,
+      exponential backoff, circuit pause), and ships a one-click tool that generates the
+      <strong>Excel OID map</strong> used to configure the monitoring side.
+    </p>
+  </div>
+
+  <section class="case-section">
+    <h2>Overview</h2>
+    <p>
+      MMS keeps the latest value for every sensor across the monitored equipment. The
+      service was first commissioned by a customer whose operations team already ran a
+      network management system and wanted those values there, not in another dashboard.
+      SNMP is the one protocol every NMS speaks, so the agent was built generically: nothing
+      in it is specific to that customer, and it can be dropped onto any MMS installation.
+      The goals were:
+    </p>
+    <ul class="bullets">
+      <li>
+        <strong>Standard protocol, zero client-side work</strong> — any SNMP v1/v2c manager
+        can walk and poll the data.
+      </li>
+      <li>
+        <strong>No load or risk on the platform</strong> — the agent only reads the database,
+        on a fixed interval, no matter how often it is polled.
+      </li>
+      <li>
+        <strong>Works with MySQL and MariaDB</strong> — it runs unchanged against either
+        engine, through MySqlConnector and portable SQL.
+      </li>
+      <li>
+        <strong>Self-documenting</strong> — every deployment can generate an up-to-date
+        spreadsheet mapping each OID to its equipment, sensor, unit, value meanings and alarm
+        rules.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Architecture</h2>
+    <pre class="diagram"> NMS ──SNMP v1/v2c (UDP 1161)──▶  MmsSnmpAgent  (Windows service "MMSSnmpAgent")
+                                  │
+                                  ├─ SnmpAgentHostedService
+                                  │    UDP listener → parse → community check
+                                  │    → GET / GETNEXT / GETBULK → response
+                                  │              │ reads
+                                  │              ▼
+                                  ├─ SensorSnapshotCache   (one reference to an
+                                  │    immutable SensorMibSnapshot, atomic swap)
+                                  │              ▲ publishes
+                                  │              │
+                                  └─ SensorSnapshotRefreshService
+                                       every 15 s: one SQL query → build snapshot
+                                       on failure: exponential backoff + circuit pause
+                                                     │
+                                                     ▼
+                                          MMS database  (MySQL or MariaDB)</pre>
+    <ul class="bullets">
+      <li>
+        <strong>Two hosted services and one shared cache</strong>, composed with
+        <code>Microsoft.Extensions.Hosting</code> and registered as a Windows service through
+        <code>AddWindowsService</code>.
+      </li>
+      <li>
+        <strong>Reads and writes are fully decoupled.</strong> The refresh service builds a
+        complete new snapshot off to the side and publishes it with a single reference swap;
+        the listener grabs the current snapshot once per request. A response never mixes two
+        refreshes, and there are no locks on either side.
+      </li>
+      <li>
+        <strong>Polling cost is independent of NMS traffic</strong> — however aggressively
+        the network is polled, the database sees one query per refresh interval.
+      </li>
+      <li>
+        <strong>Configuration</strong> is bound through <code>IOptionsMonitor</code> in
+        separate <code>Database</code> and <code>SnmpAgent</code> sections: bind address,
+        port, community, enterprise number, value scale factor, refresh interval and verbose
+        logging.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Tech stack</h2>
+    <table class="stack-table">
+      <tbody>
+        <tr>
+          <th scope="row">Runtime</th>
+          <td>.NET 8 Worker Service (<code>Microsoft.Extensions.Hosting</code>), hosted as a Windows service</td>
+        </tr>
+        <tr>
+          <th scope="row">SNMP</th>
+          <td>Lextm.SharpSnmpLib for message parsing and encoding; request handling written on a raw <code>UdpClient</code></td>
+        </tr>
+        <tr>
+          <th scope="row">Database</th>
+          <td>MySQL or MariaDB, through MySqlConnector (async ADO.NET driver compatible with both)</td>
+        </tr>
+        <tr>
+          <th scope="row">Data structures</th>
+          <td>Immutable snapshots, <code>FrozenDictionary</code> for O(1) GET, sorted OID list with binary search for GETNEXT</td>
+        </tr>
+        <tr>
+          <th scope="row">Documentation tool</th>
+          <td>PowerShell + SQL template + a .NET 8 console tool using ClosedXML to build the .xlsx</td>
+        </tr>
+        <tr>
+          <th scope="row">Packaging</th>
+          <td>Framework-dependent <code>dotnet publish</code> for win-x64, custom MSBuild target, batch installer using <code>sc</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="case-section">
+    <h2>The OID model</h2>
+    <p>Every active sensor becomes a row in a private enterprise table:</p>
+    <pre class="diagram">1.3.6.1.4.1.&lt;PEN&gt;.1.&lt;sensorId&gt;.&lt;column&gt;
+
+  column 1   value_scaled        Integer32     latest reading × scale factor
+  column 2   last_reading_time   OctetString   ISO-8601 UTC timestamp</pre>
+    <ul class="bullets">
+      <li>
+        <strong>Integer-only values.</strong> SNMP has no decimal type, so readings are
+        multiplied by a configurable scale factor — <code>1</code> sends the rounded
+        engineering value, <code>10000</code> keeps four decimal places for the NMS to divide
+        back. Values are rounded away from zero and clamped to the Integer32 range.
+      </li>
+      <li>
+        <strong>Explicit sentinels.</strong> When the parent equipment is offline the value is
+        <code>-1</code>, so the NMS can alarm on "equipment offline" separately from any
+        threshold on the reading itself.
+      </li>
+      <li>
+        <strong>Freshness is visible.</strong> The timestamp column lets the NMS tell stale
+        data from live data — including while the database is unreachable.
+      </li>
+      <li>
+        <strong>Only live objects are exposed.</strong> Inactive or deleted sensors, and
+        sensors on deleted equipment, are filtered out, so the OID table matches exactly what
+        MMS itself shows.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>SNMP engine</h2>
+    <p>
+      Rather than a full agent framework, request handling is written directly on a
+      <code>UdpClient</code>, with SharpSnmpLib used only to parse and encode messages:
+    </p>
+    <ul class="bullets">
+      <li>
+        <strong>GET</strong> — direct lookup in a <code>FrozenDictionary</code> keyed by OID;
+        unknown OIDs return <code>noSuchObject</code>.
+      </li>
+      <li>
+        <strong>GETNEXT</strong> — a <strong>binary search</strong> over the pre-sorted OID
+        list, O(log n) per lookup regardless of table size, returning
+        <code>endOfMibView</code> past the last object. This is what makes
+        <code>snmpwalk</code> work.
+      </li>
+      <li>
+        <strong>GETBULK</strong> — implemented to <strong>RFC 3416</strong>: the first
+        <em>non-repeaters</em> variables resolve as single GETNEXTs, the rest repeat up to
+        <em>max-repetitions</em>. NMS tools rely on this to walk large tables in few
+        round-trips.
+      </li>
+      <li>
+        <strong>Defensive by default</strong> — v1/v2c only; wrong-community requests and
+        trap/inform PDUs are dropped; malformed datagrams are logged at debug level and
+        skipped; a failure on one message never stops the listener.
+      </li>
+      <li>
+        Listens on <strong>UDP 1161</strong> by default to avoid needing elevated privileges
+        for port 161, with a configurable bind address per network interface.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Built to run unattended</h2>
+    <p>
+      The service runs on customer infrastructure where nobody is watching it, so
+      availability and self-recovery drove the design:
+    </p>
+    <ul class="bullets">
+      <li>
+        <strong>One fault doesn't kill the process</strong> —
+        <code>BackgroundServiceExceptionBehavior.Ignore</code> stops a crashed hosted service
+        from taking down the host.
+      </li>
+      <li>
+        <strong>Self-restarting loops</strong> — each service wraps its main loop in a
+        supervisor that logs at <em>Critical</em> and restarts after a short delay (5 s for the
+        listener, 10 s for the refresh loop), while still shutting down cleanly on
+        cancellation.
+      </li>
+      <li>
+        <strong>Database failures degrade gracefully</strong> — failed refreshes back off
+        exponentially from 5 s up to 5 min, and after 5 consecutive failures a circuit pause
+        of at least 2 min stops the agent from hammering a struggling database. The backoff
+        arithmetic is overflow-safe.
+      </li>
+      <li>
+        <strong>Keeps serving through an outage</strong> — the last good snapshot stays live,
+        so the NMS keeps getting answers while the timestamps show how old they are.
+      </li>
+      <li>
+        <strong>Operational logging</strong> — a summary on every refresh (sensor and OID
+        counts), plus a verbose mode with sensor-ID range, offline-sensor count and first/last
+        OID for field diagnostics.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>OID documentation export</h2>
+    <p>
+      An SNMP integration is only as good as its handover document, so the documentation is
+      generated straight from the live database and can never drift from what the agent
+      actually exposes:
+    </p>
+    <pre class="diagram">ExportMmsSnmpOidTable.bat
+   └─▶ PowerShell: resolve config → find a real mysql client → run SQL template
+          └─▶ mysql --batch  (TSV)
+                 └─▶ MmsOidTableToXlsx.exe  (ClosedXML)  ──▶  mms_snmp_oid_table.xlsx</pre>
+    <ul class="bullets">
+      <li>
+        <strong>The workbook</strong> — a first sheet with the SNMP connection details (IP,
+        port, version, community), then <strong>one sheet per equipment</strong> listing each
+        sensor's name, unit, value map (e.g. <code>0=Closed, 1=Open</code>), its
+        <strong>alarm rules in readable form</strong> (<code>&gt;= 30 — High temperature
+        [sev 2]</code>, <code>bit3=1 — …</code>) and the exact OID.
+      </li>
+      <li>
+        <strong>SQL does the heavy lifting</strong> — <code>GROUP_CONCAT</code> and
+        <code>CASE</code> expressions render threshold, range and bit-mask alarm triggers as
+        readable rules, with a separator token so multi-line cells survive the TSV hand-off.
+      </li>
+      <li>
+        <strong>A polished spreadsheet</strong> — styled headers, zebra striping, frozen
+        header rows, wrapped multi-line columns sized to their longest line, and sheet names
+        sanitised to Excel's 31-character uniqueness rules.
+      </li>
+      <li>
+        <strong>Robust on real field PCs</strong> — config from <code>appsettings.json</code>
+        or a separate credentials file with environment-variable overrides; locates a
+        genuine <code>mysql.exe</code> from either a MySQL or a MariaDB installation while
+        skipping the WindowsApps execution-alias shims that break on many Windows machines;
+        passwords masked in debug output.
+      </li>
+      <li>
+        <strong>Packaged with the agent</strong> — a custom MSBuild target
+        (<code>AfterTargets="Publish"</code>) builds the xlsx tool into <code>tools\</code>,
+        so every published package can produce its own documentation.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Deployment</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Build</strong> — framework-dependent <code>dotnet publish</code> for win-x64,
+        with the scripts copied into the package through MSBuild content rules.
+      </li>
+      <li>
+        <strong>Install</strong> — <code>MmsSnmpAgent-RunOrInstall.bat</code> works from both
+        the source tree (dev run, publish, publish + install) and a pre-built package (console
+        test run, install). It checks for administrator rights, cleanly stops and removes an
+        existing service before reinstalling, registers <code>MMSSnmpAgent</code> with
+        automatic start, and tells the operator where to configure it.
+      </li>
+      <li>
+        <strong>Double-click friendly</strong> — an interactive menu and pause-on-error mean a
+        field technician can deploy it without knowing .NET.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>What this project demonstrates</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Protocol-level work</strong> — implementing SNMP agent semantics (GETNEXT
+        ordering, GETBULK per RFC 3416, v2c exception values) instead of configuring an
+        off-the-shelf agent.
+      </li>
+      <li>
+        <strong>Lock-free concurrency</strong> — immutable snapshots with a single atomic
+        reference swap keep the hot request path contention-free and always consistent.
+      </li>
+      <li>
+        <strong>Reliability engineering for unattended systems</strong> — supervised loops,
+        exponential backoff, a circuit pause, and graceful degradation that keeps serving
+        data through a database outage.
+      </li>
+      <li>
+        <strong>Designing for reuse</strong> — built for one customer but kept generic:
+        configuration-driven, and portable across MySQL and MariaDB.
+      </li>
+      <li>
+        <strong>Designing for the consumer</strong> — integer scaling, offline sentinels and
+        timestamps chosen so the NMS can alarm on the data correctly.
+      </li>
+      <li>
+        <strong>Handover as part of the product</strong> — generated, always-accurate OID
+        documentation and one-click installation for field deployment.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>My role</h2>
+    <p>
+      Sole developer: requirements for the NMS integration, OID model design, the SNMP
+      engine, the refresh and resilience logic, the Excel export tool chain, and the
+      packaging and installation scripts.
+    </p>
+  </section>
+
+  <nav class="case-nav">
+    <a href="../index.html#projects" class="btn btn-ghost">&larr; ./all-projects</a>
+    <span class="case-nav-links">
+      <a href="modsecure-mms.html" class="btn btn-ghost">ModSecure MMS &rarr;</a>
+      <a href="ems-platform.html" class="btn btn-ghost">EMS Platform &rarr;</a>
+    </span>
+  </nav>
+
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="branch"><span class="branch-dot" aria-hidden="true"></span>main</span>
+    <span class="statusbar-spacer"></span>
+    <span>UTF-8</span>
+    <span id="year"></span>
+  </div>
+</footer>
+
+<script src="../js/script.js"></script>
+</body>
+</html>
