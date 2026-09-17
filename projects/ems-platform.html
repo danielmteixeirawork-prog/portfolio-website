@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EMS Platform — Daniel Teixeira</title>
-<meta name="description" content="Case study: a solo-built, production full-stack platform for monitoring data-centre infrastructure — ASP.NET Core .NET 10 API, React 19 SPA, MySQL, and a fleet of 9–11 independent protocol workers (Modbus, SNMP, BACnet, Siemens S7, GPIO).">
+<meta name="description" content="Case study: a solo-built, production full-stack platform for monitoring data-centre infrastructure — ASP.NET Core .NET 10 API, React 19 SPA, MariaDB, and a fleet of 9–11 independent protocol workers (Modbus, SNMP, BACnet, Siemens S7, GPIO).">
 <link rel="stylesheet" href="../css/style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,7 +44,7 @@
       <li class="is-role">Sole developer &amp; operator</li>
       <li>ASP.NET Core (.NET 10)</li>
       <li>React 19</li>
-      <li>MySQL + Dapper</li>
+      <li>MariaDB + Dapper</li>
       <li>Worker Services</li>
       <li>Modbus / SNMP / BACnet / S7</li>
       <li>Linux · systemd · Nginx</li>
@@ -92,23 +92,28 @@
     <h2>Architecture</h2>
     <p>
       A classic API + SPA split, deployed together behind Nginx on a single host, with
-      MySQL as the system of record:
+      MariaDB as the system of record:
     </p>
     <pre class="diagram">Browser (React SPA)
       │  HTTPS
       ▼
    Nginx  ──────────────▶  ems-backend.service (ASP.NET Core, Kestrel)
       │                          │
-      │                          ├─ Dapper (micro-ORM) ──▶ MySQL
+      │                          ├─ Dapper (micro-ORM) ──▶ MariaDB
       │                          ├─ Server-Sent Events (live sensor/alarm push)
-      │                          └─ MySQL-backed auth ticket store (custom cookie auth)
+      │                          └─ MariaDB-backed auth ticket store (custom cookie auth)
       ▼
  static assets (built SPA, served from the API's "public" wwwroot)</pre>
     <ul class="bullets">
       <li>
         <strong>Backend</strong>: ASP.NET Core on .NET 10, MVC-style Controllers →
-        Repositories. <strong>No EF Core</strong> — raw SQL via Dapper and MySqlConnector,
-        for full control over query shape and performance on a hand-tuned schema.
+        Repositories. <strong>No EF Core</strong> — raw SQL via Dapper and MySqlConnector
+        (a MySQL-wire-protocol .NET driver that is also MariaDB-compatible), for full
+        control over query shape and performance on a hand-tuned schema.
+      </li>
+      <li>
+        <strong>Database engine</strong>: MariaDB 10.11, running as
+        <code>mariadb.service</code>.
       </li>
       <li>
         <strong>Frontend</strong>: React 19 + TypeScript built with Vite, served as static
@@ -121,7 +126,7 @@
       </li>
       <li>
         <strong>Auth</strong>: cookie-based session auth with a custom
-        <strong>MySQL-backed ticket store</strong> (not the default in-memory / data
+        <strong>MariaDB-backed ticket store</strong> (not the default in-memory / data
         protection flow), CSRF middleware, and a permission-based authorization handler
         gating admin actions by role and permission.
       </li>
@@ -149,7 +154,7 @@
 ├── Services/       cross-cutting logic: Hikvision door control, RTSP URL building,
 │                   Excel export (ClosedXML), credential encryption, BACnet discovery,
 │                   email/SMS settings, system helper bridge, SSE broadcast
-├── Auth/           CSRF service, MySQL ticket store, permission authorization handler
+├── Auth/           CSRF service, MariaDB ticket store, permission authorization handler
 ├── Middleware/     audit log, CSRF, CORS, security headers, request ID
 ├── Models/         DTOs grouped by domain (Admin, Alarms, Analytics, Auth, Cctv, …)
 └── Setup_DB/       SQL schema, timestamped migrations, seed data, shell scripts</pre>
@@ -206,7 +211,7 @@
   <section class="case-section">
     <h2>Database</h2>
     <p>
-      MySQL, schema-managed through versioned SQL migration files
+      MariaDB, schema-managed through versioned SQL migration files
       (<code>Setup_DB/migrations/</code>) applied by a tracked shell script, with a separate
       <code>seed/</code> directory for reference data (sensor-type icon catalogues, for
       example) and a <code>utilities/</code> folder for one-off maintenance scripts.
@@ -228,7 +233,7 @@
     <p>
       Nine to eleven independent .NET Worker Service processes
       (<code>Microsoft.Extensions.Hosting</code>), each a long-running daemon polling one
-      class of field hardware and writing readings into the shared MySQL database the API
+      class of field hardware and writing readings into the shared MariaDB database the API
       reads from. Each is its own systemd unit, independently deployable and restartable —
       a genuine microservice decomposition rather than a monolith, chosen so that a crash
       or hang in one protocol driver (a flaky Modbus RTU serial line, say) can't take down
@@ -257,7 +262,7 @@
     <ul class="bullets">
       <li>
         Shared conventions across all of them: Serilog file + console logging,
-        MySqlConnector for direct database access, DotNetEnv for <code>.env</code>-based
+        MySqlConnector for direct MariaDB access, DotNetEnv for <code>.env</code>-based
         configuration (credentials, poll intervals, device lists), a common
         <code>Shared/</code> project, and a <code>Directory.Build.props</code> for
         consistent build settings.
