@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maxi Protocol Tester — Daniel Teixeira</title>
+<meta name="description" content="Case study: a .NET 10 WPF commissioning toolkit for data-centre field devices — Modbus TCP and RS485 RTU/ASCII, Siemens S7, SNMP v1/v2c/v3, SMTP and a GSM gateway over AMI — rewritten from a legacy WinForms tool, with hardware-free integration tests.">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <nav class="tabs">
+      <a href="../index.html#top" class="tab">about.md</a>
+      <a href="../index.html#projects" class="tab">projects.tsx</a>
+      <a href="maxi-protocol-tester.html" class="tab" aria-current="page">maxi-protocol-tester.md</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
+      <span class="theme-icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<main class="case">
+
+  <p class="breadcrumb">
+    <a href="../index.html">~</a><span class="sep">/</span><a href="../index.html#projects">projects</a><span class="sep">/</span>maxi-protocol-tester
+  </p>
+
+  <header class="case-header">
+    <p class="case-kicker">// work project &middot; Maxiglobal</p>
+    <h1 class="case-title">Maxi Protocol Tester</h1>
+    <p class="case-lede">
+      A bench and field tool for data-centre commissioning: test every protocol the monitoring
+      platform depends on — field buses, PLCs, SNMP agents, email and SMS gateways — from one
+      fast, readable desktop app.
+    </p>
+    <ul class="case-meta">
+      <li class="is-role">Design &amp; sole developer</li>
+      <li>C# / .NET 10</li>
+      <li>WPF · MVVM</li>
+      <li>Modbus TCP / RTU</li>
+      <li>Siemens S7</li>
+      <li>SNMP v3</li>
+      <li>MailKit</li>
+      <li>xUnit v3</li>
+    </ul>
+  </header>
+
+  <div class="tldr">
+    <p>
+      <strong>TL;DR —</strong> Before a monitoring system goes live, every meter, UPS, PLC and
+      notification channel must be proven to answer correctly. The tool technicians used was a
+      2018 WinForms application — one 4,000-line form, a native 32-bit PLC library, vendor
+      DLLs and several latent bugs. I rewrote it from the ground up in <strong>.NET 10</strong>,
+      using the decompiled original as the functional specification: a <strong>layered,
+      dependency-injected WPF/MVVM app</strong> covering <strong>Modbus TCP and RS485
+      RTU/ASCII, Siemens S7, SNMP v1/v2c/v3, SMTP and email-to-SMS, and a Yeastar NeoGate GSM
+      gateway</strong>. It decodes registers in every numeric type and word order,
+      <strong>turns failures into probable causes</strong>, never freezes the window, and is
+      covered by <strong>52 automated tests</strong> — several of them running real protocol
+      stacks against in-process slaves and servers, with no hardware attached. It ships as a
+      <strong>single self-contained executable</strong> for site laptops.
+    </p>
+  </div>
+
+  <section class="case-section">
+    <h2>Overview</h2>
+    <p>
+      Commissioning a data-centre monitoring installation means working through dozens of
+      devices, each speaking a different protocol, and answering the same questions every
+      time: is it reachable, is the address right, does the value decode correctly, will the
+      alarm actually reach a phone? The tester puts all of that in one app, one page per
+      protocol:
+    </p>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th scope="col">Page</th><th scope="col">What the technician does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Modbus</td><td>Read and write registers and coils over TCP or a USB↔RS485 converter; decode values; poll continuously</td></tr>
+          <tr><td>Siemens S7</td><td>Read data-block bytes and force bits or bytes on S7-1200/1500/300/400 PLCs</td></tr>
+          <tr><td>SNMP</td><td>GET and WALK on UPS, PDU and environmental agents, including fully secured SNMPv3</td></tr>
+          <tr><td>Email &amp; SMS via email</td><td>Prove the SMTP server or internal relay — and email-to-SMS gateways — will deliver alarms</td></tr>
+          <tr><td>NeoGate TG100</td><td>Check the SIM and network registration, then send test SMS to several recipients</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="case-section">
+    <h2>Architecture</h2>
+    <pre class="diagram">MPT.slnx
+├── Mpt.Core          pure logic — no I/O, no UI
+│     register decoding · word orders · device presets · AMI protocol · traffic log contract
+├── Mpt.Protocols     one client per protocol, all async, all logging TX/RX
+│     Modbus (TCP + serial) · S7 · SNMP · SMTP · NeoGate AMI
+├── Mpt.App           WPF shell
+│     Generic Host DI · one ViewModel + View per protocol · themes · settings · traffic log
+└── tests
+      Mpt.Core.Tests        decoders, legacy-button equivalence, AMI parsing
+      Mpt.Protocols.Tests   Modbus TCP/RTU/ASCII, NeoGate, SNMPv3 security selection</pre>
+    <ul class="bullets">
+      <li>
+        <strong>Clean layering</strong> — protocol logic and decoders know nothing about WPF,
+        so they are unit-testable and reusable.
+      </li>
+      <li>
+        <strong>Microsoft.Extensions.Hosting</strong> composes the app; each protocol page is
+        registered as a <code>PageViewModel</code>, and registration order <em>is</em> the
+        navigation rail.
+      </li>
+      <li>
+        <strong>MVVM with source generators</strong> — CommunityToolkit.Mvvm
+        <code>[ObservableProperty]</code> / <code>[RelayCommand]</code>; a single base
+        <code>RunAsync</code> gives every operation the same busy state, timing, status line
+        and error handling.
+      </li>
+      <li>
+        <strong>Modern build hygiene</strong> — central package management, pinned SDK via
+        <code>global.json</code>, <code>.slnx</code> solution, code style enforced at build
+        time, nullable reference types throughout.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Tech stack</h2>
+    <table class="stack-table">
+      <tbody>
+        <tr>
+          <th scope="row">UI</th>
+          <td>WPF + WPF-UI 4 (Fluent), CommunityToolkit.Mvvm, light and dark palettes following the Windows theme</td>
+        </tr>
+        <tr>
+          <th scope="row">Hosting</th>
+          <td>Microsoft.Extensions.Hosting — dependency injection and lifetime</td>
+        </tr>
+        <tr>
+          <th scope="row">Modbus</th>
+          <td>NModbus 3 + System.IO.Ports — TCP, RTU and ASCII</td>
+        </tr>
+        <tr>
+          <th scope="row">Siemens S7</th>
+          <td>S7netplus, fully managed (replaces a native 32-bit libnodave)</td>
+        </tr>
+        <tr>
+          <th scope="row">SNMP</th>
+          <td>Lextm.SharpSnmpLib — v1, v2c, v3 USM with MD5/SHA-1/SHA-2 and DES/AES</td>
+        </tr>
+        <tr>
+          <th scope="row">Email</th>
+          <td>MailKit — STARTTLS, implicit TLS, unauthenticated relay (replaces the obsolete <code>SmtpClient</code>)</td>
+        </tr>
+        <tr>
+          <th scope="row">GSM gateway</th>
+          <td>In-house async AMI client (replaces a vendor DLL)</td>
+        </tr>
+        <tr>
+          <th scope="row">Tests</th>
+          <td>xUnit v3 on Microsoft.Testing.Platform</td>
+        </tr>
+        <tr>
+          <th scope="row">Packaging</th>
+          <td>Self-contained, compressed single-file <code>win-x64</code> executable</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="case-section">
+    <h2>Modbus — from raw registers to real values</h2>
+    <ul class="bullets">
+      <li>
+        <strong>TCP and serial behind one API</strong> — <code>ModbusTcpEndpoint</code> and
+        <code>ModbusSerialEndpoint</code> share the same read/write calls (FC01–06, FC16);
+        serial supports RTU and ASCII framing with configurable baud, parity, data and stop
+        bits.
+      </li>
+      <li>
+        <strong>Probe-style connections</strong> — each call opens and closes its own socket or
+        COM port, so a dropped link or an unplugged USB converter never leaves a stale session.
+      </li>
+      <li>
+        <strong>Real cancellation</strong> — NModbus has none, so cancelling closes the
+        underlying socket or port to unblock it; blocking serial I/O runs off the UI thread.
+      </li>
+      <li>
+        <strong>Converters identified by name</strong> — COM ports are listed with their Device
+        Manager names via WMI (e.g. <code>COM5 · USB-SERIAL CH340</code>), so the right
+        converter is obvious among several.
+      </li>
+      <li>
+        <strong>No more 0- vs 1-based guessing</strong> — a live hint shows exactly which
+        addresses go on the wire.
+      </li>
+      <li>
+        <strong>Decode inspector</strong> for the selected register: a <strong>matrix of Int32 /
+        UInt32 / Float32 / Int64 / UInt64 / Float64 × ABCD / CDAB / BADC / DCBA</strong>, a
+        16-bit view, and <strong>device presets</strong> that walk a whole block (Janitza
+        float, Schneider PM500, base-10000 energy counters…), named after the old tool's
+        buttons so technicians recognise them.
+      </li>
+      <li>
+        <strong>Continuous polling</strong> at a configurable interval, stopping cleanly on the
+        first failure.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Siemens S7, SNMP, email and GSM</h2>
+    <ul class="bullets">
+      <li>
+        <strong>S7</strong> — addresses in TIA Portal notation (<code>DB1.DBX0.3</code>), a
+        per-byte bit grid with the target bit highlighted, bit and byte writes (decimal, hex or
+        binary input), CPU presets that set the right default slot, and an ISO-TCP port 102
+        probe with latency.
+      </li>
+      <li>
+        <strong>SNMP</strong> — GET on several OIDs and WALK (bulk walk on v3), quick picks for
+        standard OIDs, and full <strong>SNMPv3 USM</strong>: engine discovery, all three
+        security levels, MD5 through SHA-512, DES/AES-128/192/256, with password lengths
+        validated <em>before</em> anything is sent.
+      </li>
+      <li>
+        <strong>Email</strong> — STARTTLS, SSL/TLS or plain relay with the port following the
+        security mode, plus <strong>email-to-SMS gateway</strong> testing (one message per
+        number, number in the subject).
+      </li>
+      <li>
+        <strong>NeoGate TG100 GSM gateway</strong> — a purpose-built AMI client: validates the
+        banner, logs in, parses <code>gsm show spans</code> into a SIM state (active, no SIM, no
+        network…), <strong>refuses to send if the SIM isn't ready</strong>, sends each SMS in
+        <strong>its own session</strong> so one failure never blocks the rest, and confirms
+        delivery by correlating a per-message ID with <code>Status: 1</code>.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Errors that explain themselves</h2>
+    <p>
+      Most commissioning time is lost working out <em>why</em> something doesn't answer. Every
+      protocol client translates low-level failures into the most likely cause:
+    </p>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th scope="col">On the wire</th><th scope="col">What the technician reads</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Modbus exception 02</td><td>Illegal address — check whether the device counts from 0 or 1</td></tr>
+          <tr><td>Modbus exception 0B</td><td>The device behind the gateway didn't answer — check the Unit ID</td></tr>
+          <tr><td>Serial CRC failure</td><td>Usually baud or parity mismatch, swapped A/B wires, or missing RS485 termination</td></tr>
+          <tr><td>COM port access denied</td><td>The port is in use by another program</td></tr>
+          <tr><td>S7 connection error</td><td>Check rack/slot and that PUT/GET access is enabled in TIA Portal</td></tr>
+          <tr><td>S7 read rejected</td><td>The DB must exist, be non-optimised and be large enough</td></tr>
+          <tr><td>SNMPv3 report: wrong digests</td><td>Authentication rejected — check MD5/SHA and the password</td></tr>
+          <tr><td>SNMPv3 decryption failure</td><td>Check the privacy protocol (DES/AES) and password</td></tr>
+          <tr><td>AMI login response</td><td>Login refused — check the API user and secret on the gateway</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="case-section">
+    <h2>Built for the field</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Traffic log</strong> — a dockable panel (Ctrl+L) with every TX, RX, OK, WARN
+        and ERR line, timestamped per channel, mirrored to a daily log file, copyable and
+        exportable, and capped so long sessions stay responsive.
+      </li>
+      <li>
+        <strong>Never freezes, never quits</strong> — all I/O is async; unhandled UI exceptions
+        are logged and the app keeps running, so a bug never ends a commissioning session.
+        Startup failures are written to a diagnostics file.
+      </li>
+      <li>
+        <strong>Guards on real-world actions</strong> — sending real emails and SMS requires
+        explicit confirmation, and recipient lists are validated as you type, with suspicious
+        numbers flagged.
+      </li>
+      <li>
+        <strong>Remembers the site</strong> — last IP, port and settings per page, saved to
+        JSON with an atomic write (temp file, then move) and a corrupt file falling back to
+        defaults. <strong>SMTP passwords, SNMPv3 keys and gateway secrets are encrypted with
+        DPAPI</strong> for the current Windows user.
+      </li>
+      <li>
+        <strong>Fits the hardware</strong> — the window sizes itself to the screen, from a
+        small site laptop to an office monitor.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Rewriting a legacy tool</h2>
+    <p>
+      The decompiled 2018 application served as the functional specification, and every
+      legacy feature has a documented home in the new app. Rebuilding it properly surfaced
+      latent bugs that were fixed along the way:
+    </p>
+    <ul class="bullets">
+      <li>
+        <strong>S7</strong> — the CPU model chosen in a combo box was silently used as the
+        <em>number of bytes to read</em>, and rack/slot were hard-coded to 0/0, which breaks
+        S7-1200/1500 (normally slot 1).
+      </li>
+      <li>
+        <strong>GSM gateway</strong> — an internal copy of the client re-sent the login command
+        where it should have sent the SMS command.
+      </li>
+      <li>
+        <strong>IEEE 754 decoding</strong> — the old button combined words in a byte order no
+        real device uses; the new decoder shows all four standard orders side by side.
+      </li>
+      <li>
+        <strong>UX</strong> — generic exception message boxes and blocking calls replaced by
+        explained errors and a responsive UI.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>Testing without hardware</h2>
+    <ul class="bullets">
+      <li><strong>Modbus TCP</strong> against a real NModbus slave listening on loopback.</li>
+      <li>
+        <strong>Modbus RTU and ASCII</strong> against a real NModbus slave joined by an
+        <strong>in-memory full-duplex serial line</strong> with serial-port timeout semantics
+        — the complete framing and CRC path, with no RS485 converter.
+      </li>
+      <li>
+        <strong>NeoGate</strong> against a <strong>scripted AMI server</strong> that behaves
+        like the real gateway (right and wrong secrets, SIM present and missing, SMS
+        acknowledgement by message ID).
+      </li>
+      <li>
+        <strong>Legacy equivalence tests</strong> prove the new decoders give the same results
+        as the old device buttons, byte for byte.
+      </li>
+      <li><strong>SNMPv3 security selection</strong> tested for every level, hash and cipher.</li>
+      <li>
+        <strong>The publish script runs the full suite first</strong> and refuses to build the
+        executable if anything fails.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>What this project demonstrates</h2>
+    <ul class="bullets">
+      <li>
+        <strong>Deep protocol knowledge</strong> — Modbus framing, addressing and word order;
+        S7 data-block addressing; the SNMPv3 security model; AMI as a text protocol.
+      </li>
+      <li>
+        <strong>Legacy modernisation</strong> — reading a decompiled binary as a specification,
+        preserving behaviour where it was right and fixing it where it wasn't.
+      </li>
+      <li>
+        <strong>Software design</strong> — clean separation of pure logic, protocol clients and
+        UI; dependency injection; MVVM; consistent operation handling.
+      </li>
+      <li>
+        <strong>Testing hard-to-test code</strong> — real protocol stacks exercised end to end
+        without devices, cables or gateways.
+      </li>
+      <li>
+        <strong>Tooling for the people who use it</strong> — diagnostics written for
+        technicians, safe defaults, encrypted secrets, single-file deployment.
+      </li>
+    </ul>
+  </section>
+
+  <section class="case-section">
+    <h2>My role</h2>
+    <p>
+      Sole developer: legacy analysis, architecture, all protocol clients and decoders, the
+      WPF interface and theming, the test suite, and the publishing pipeline.
+    </p>
+  </section>
+
+  <nav class="case-nav">
+    <a href="../index.html#projects" class="btn btn-ghost">&larr; ./all-projects</a>
+    <span class="case-nav-links">
+      <a href="gt-gest.html" class="btn btn-ghost">Gt Gest &rarr;</a>
+      <a href="kiosk-manager.html" class="btn btn-ghost">Kiosk Manager &rarr;</a>
+    </span>
+  </nav>
+
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="branch"><span class="branch-dot" aria-hidden="true"></span>main</span>
+    <span class="statusbar-spacer"></span>
+    <span>UTF-8</span>
+    <span id="year"></span>
+  </div>
+</footer>
+
+<script src="../js/script.js"></script>
+</body>
+</html>
