@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daniel Teixeira — Portfolio</title>
 <meta name="description" content="Portfolio of Daniel Teixeira, Systems Engineer & Product Manager building full-stack industrial monitoring platforms.">
-<link rel="stylesheet" href="css/style.css?v=5">
+<link rel="stylesheet" href="css/style.css?v=6">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -21,11 +21,29 @@
       <a href="#projects" class="tab">projects.tsx</a>
       <a href="#contact" class="tab">contact.sh</a>
     </nav>
+    <button class="palette-trigger" id="paletteTrigger" aria-haspopup="dialog" aria-label="Open command palette">
+      <span aria-hidden="true">&gt;_</span>
+      <span class="kbd" id="paletteKbd">Ctrl K</span>
+    </button>
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" aria-pressed="false">
       <span class="theme-icon" aria-hidden="true">◐</span>
     </button>
   </div>
 </header>
+
+<div class="palette-backdrop" id="paletteBackdrop" hidden>
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="card-chrome">
+      <span></span><span></span><span></span>
+      <span class="filename">command.palette</span>
+    </div>
+    <div class="palette-input-row">
+      <span class="prompt">$</span>
+      <input type="text" id="paletteInput" class="palette-input" placeholder="Type a command…" autocomplete="off" spellcheck="false">
+    </div>
+    <ul class="palette-list" id="paletteList" role="listbox"></ul>
+  </div>
+</div>
 
 <main id="top">
 
@@ -530,9 +548,9 @@
         <span class="filename">contact.sh</span>
       </div>
       <div class="terminal-body">
-        <p><span class="prompt">$</span> mail <a href="mailto:danielteixeira00@outlook.pt">danielteixeira00@outlook.pt</a></p>
-        <p><span class="prompt">$</span> open <a href="https://github.com/danielmteixeirawork-prog" target="_blank" rel="noopener">github.com/danielmteixeirawork-prog</a></p>
-        <p><span class="prompt">$</span> open <a href="https://www.linkedin.com/in/daniel-teixeira-806b9b137" target="_blank" rel="noopener">linkedin.com/in/daniel-teixeira</a></p>
+        <p><span class="prompt">$</span> mail <a href="mailto:danielteixeira00@outlook.pt">danielteixeira00@outlook.pt</a><button class="copy-btn" data-copy="danielteixeira00@outlook.pt" aria-label="Copy email address">copy</button></p>
+        <p><span class="prompt">$</span> open <a href="https://github.com/danielmteixeirawork-prog" target="_blank" rel="noopener">github.com/danielmteixeirawork-prog</a><button class="copy-btn" data-copy="https://github.com/danielmteixeirawork-prog" aria-label="Copy GitHub URL">copy</button></p>
+        <p><span class="prompt">$</span> open <a href="https://www.linkedin.com/in/daniel-teixeira-806b9b137" target="_blank" rel="noopener">linkedin.com/in/daniel-teixeira</a><button class="copy-btn" data-copy="https://www.linkedin.com/in/daniel-teixeira-806b9b137" aria-label="Copy LinkedIn URL">copy</button></p>
       </div>
     </div>
   </section>
